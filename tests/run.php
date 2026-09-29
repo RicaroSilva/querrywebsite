@@ -256,7 +256,7 @@ test('blocks writes, auto-fixes SQL errors and answers', function () {
     eq([['Rui', 30]], $r['result']['rows']);
     eq(2, count($r['attempts']));
     ok(str_contains($r['attempts'][0]['error'], 'read-only'), 'write refused');
-    ok(str_contains($fake->calls[0][0]['content'], 'TABLE sales(person TEXT, amount NUMERIC)'), 'schema in prompt');
+    ok(str_contains($fake->calls[0][0]['content'], "TABLE sales\n  (person TEXT, amount NUMERIC)"), 'schema in prompt');
     ok(str_contains(end($fake->calls)[1]['content'], "Rui\t30"), 'result rows sent for the answer');
     eq(3, (int) (new PDO('sqlite:' . $file))->query('SELECT COUNT(*) FROM sales')->fetchColumn(), 'data untouched');
     @unlink($file);

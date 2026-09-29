@@ -23,6 +23,8 @@ final class Env
                 $quote = $value[0];
                 $end = strpos($value, $quote, 1);
                 $value = $end === false ? substr($value, 1) : substr($value, 1, $end - 1);
+            } elseif (str_starts_with($value, '#')) {
+                $value = ''; // "KEY=   # comment" → empty
             } else {
                 $value = trim(preg_replace('/\s+#.*$/', '', $value));
             }

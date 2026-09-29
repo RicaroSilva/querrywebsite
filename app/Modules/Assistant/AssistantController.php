@@ -64,6 +64,82 @@ final class AssistantController
         }
     }
 
+    // ---------------------------------------------------------------- knowledge
+    public function knowledge(Request $request): never
+    {
+        $conn = (new ConnectionRepository())->findOrFail($request->int('connection_id'));
+        $repo = new KnowledgeRepository();
+        $database = $request->str('database') ?: null;
+        $tables = null;
+        try {
+            $tables = SchemaCatalog::load($conn, $database)->count();
+        } catch (\Throwable) {
+        }
+        Response::json(['ok' => true, 'notes' => $repo->notes((int) $conn['id']), 'examples' => $repo->examples((int) $conn['id']),
+            'tables' => $tables, 'can_teach' => Auth::can('assistant.teach')]);
+    }
+
+    public function saveNotes(Request $request): never
+    {
+        $conn = (new ConnectionRepository())->findOrFail($request->int('connection_id'));
+        $notes = mb_substr((string) $request->input('notes', ''), 0, 30000);
+        (new KnowledgeRepository())->saveNotes((int) $conn['id'], $notes);
+        Audit::log('assistant.notes', 'connection', $conn['id'], ['chars' => mb_strlen($notes)]);
+        Response::json(['ok' => true]);
+    }
+
+    public function addExample(Request $request): never
+    {
+        $conn = (new ConnectionRepository())->findOrFail($request->int('connection_id'));
+        $q = trim(mb_substr($request->str('question'), 0, 2000));
+        $sql = trim($request->str('sql'));
+        if ($q === '' || $sql === '' || !\App\Modules\Execution\SqlSplitter::isReadOnly($sql)) {
+            throw new HttpException(422, 'Exemplo inválido (é preciso a pergunta e um SELECT).');
+        }
+        $id = (new KnowledgeRepository())->addExample((int) $conn['id'], $q, $sql);
+        Audit::log('assistant.example', 'connection', $conn['id'], ['id' => $id]);
+        Response::json(['ok' => true, 'id' => $id]);
+    }
+
+    public function deleteExample(Request $request): never
+    {
+        (new KnowledgeRepository())->deleteExample($request->int('connection_id'), (int) $request->param('id'));
+        Response::json(['ok' => true]);
+    }
+
+    /** Re-read the database structure (after schema changes). */
+    public function refreshSchema(Request $request): never
+    {
+        $conn = (new ConnectionRepository())->findOrFail($request->int('connection_id'));
+        $database = $request->str('database') ?: null;
+        Session::release();
+        set_time_limit(300);
+        SchemaCatalog::forget($conn, $database);
+        try {
+            Response::json(['ok' => true, 'tables' => SchemaCatalog::load($conn, $database)->count()]);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => preg_replace('/^SQLSTATE\[[^\]]*\]\s*(\[[^\]]*\]\s*)*/', '', $e->getMessage())]);
+        }
+    }
+
+    /** Ask the model to draft notes describing the database (user reviews before saving). */
+    public function describe(Request $request): never
+    {
+        if (!config('ai.enabled')) {
+            throw new HttpException(422, 'O assistente IA está desativado.');
+        }
+        $conn = (new ConnectionRepository())->findOrFail($request->int('connection_id'));
+        $database = $request->str('database') ?: null;
+        $model = preg_match('/^[\w.:\/@+-]{1,120}$/', $request->str('model')) ? $request->str('model') : null;
+        Session::release();
+        set_time_limit(max(120, (int) config('ai.timeout') * 2));
+        try {
+            Response::json(['ok' => true, 'notes' => (new AssistantService())->describeDatabase($conn, $database, $model)]);
+        } catch (\RuntimeException $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
     /** Check that the configured AI endpoint answers and list its models. */
     public function status(Request $request): never
     {

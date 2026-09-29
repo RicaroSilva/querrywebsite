@@ -12,6 +12,7 @@ class AiClient
     private string $base;
     private string $key;
     private int $timeout;
+    private int $numCtx;
 
     public function __construct(?array $cfg = null)
     {
@@ -19,17 +20,23 @@ class AiClient
         $this->base = rtrim((string) $cfg['base_url'], '/');
         $this->key = (string) $cfg['api_key'];
         $this->timeout = max(5, (int) $cfg['timeout']);
+        $this->numCtx = (int) ($cfg['num_ctx'] ?? 0);
     }
 
     /** @param array<int, array{role: string, content: string}> $messages */
     public function chat(array $messages, string $model, float $temperature = 0.1): string
     {
-        $data = $this->request('POST', '/chat/completions', [
+        $body = [
             'model'       => $model,
             'messages'    => $messages,
             'temperature' => $temperature,
             'stream'      => false,
-        ]);
+        ];
+        if ($this->numCtx > 0) {
+            $body['options'] = ['num_ctx' => $this->numCtx]; // Ollama / Open WebUI
+            $body['num_ctx'] = $this->numCtx;
+        }
+        $data = $this->request('POST', '/chat/completions', $body);
         $content = $data['choices'][0]['message']['content'] ?? ($data['message']['content'] ?? null);
         if (!is_string($content)) {
             throw new \RuntimeException('Resposta inesperada da IA (sem "choices[0].message.content").');

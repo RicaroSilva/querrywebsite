@@ -86,19 +86,25 @@
     el.querySelector('[data-meta]').textContent = `Assistente${meta ? ' · ' + meta : ''}`;
 
     const pending = !!r.pending;
+    const editable = pending || r.failed;
+    const ok = !pending && !r.failed && r.sql && r.result;
     body.innerHTML = `
       ${r.answer ? `<div class="ai-answer ${r.failed ? 'failed' : ''}">${mdLite(r.answer)}</div>` : ''}
       ${pending ? `<div class="ai-answer">Este é o SQL que proponho${r.explanation ? ` — ${esc(r.explanation)}` : ''}. Reveja/edite e carregue em <b>Executar</b>.</div>` : ''}
-      ${r.sql ? `<details class="ai-sql" ${pending || r.failed ? 'open' : ''}>
-          <summary>${icon('file-code', 'sm')} SQL ${pending ? 'proposto' : 'executado (só leitura)'}
+      ${r.failed && r.sql ? `<div class="ai-attempts">Pode corrigir o SQL abaixo e carregar em <b>Executar</b>; se funcionar, use <b>Correto — ensinar</b> para a IA aprender.</div>` : ''}
+      ${r.sql ? `<details class="ai-sql" ${editable ? 'open' : ''}>
+          <summary>${icon('file-code', 'sm')} SQL ${pending ? 'proposto' : r.failed ? 'com erro' : 'executado (só leitura)'}
             <span class="spacer"></span>
-            ${pending ? `<button type="button" class="btn xs run" data-a="run">${icon('play', 'sm')} Executar</button>` : ''}
+            <button type="button" class="btn xs run ${editable ? '' : 'hidden'}" data-a="run">${icon('play', 'sm')} Executar</button>
+            ${!editable ? `<button type="button" class="btn xs" data-a="edit">${icon('edit', 'sm')} Corrigir SQL</button>` : ''}
             <button type="button" class="btn xs" data-a="editor">${icon('terminal', 'sm')} Abrir no editor</button>
             <button type="button" class="btn xs" data-a="copy">${icon('copy', 'sm')} Copiar</button>
           </summary>
-          ${pending ? `<textarea spellcheck="false" data-sql>${esc(r.sql)}</textarea>` : `<pre>${esc(r.sql)}</pre>`}
+          ${editable ? `<textarea spellcheck="false" data-sql>${esc(r.sql)}</textarea>` : `<pre data-pre>${esc(r.sql)}</pre>`}
         </details>` : ''}
+      ${ok && canTeach ? `<div class="row" style="margin-top:8px;gap:6px"><button type="button" class="btn xs" data-a="learn" title="Guarda esta pergunta + SQL como exemplo: a IA passa a usá-lo em perguntas parecidas">${icon('check', 'sm')} Correto — ensinar à IA</button></div>` : ''}
       ${!pending && r.explanation ? `<div class="ai-attempts">${esc(r.explanation)}</div>` : ''}
+      ${r.tables?.length ? `<div class="ai-attempts">Tabelas consideradas (${r.tables.length} de ${r.schema_tables}): ${r.tables.map(esc).join(', ')}</div>` : ''}
       ${r.attempts?.length ? `<div class="ai-attempts">${r.failed ? 'Erros' : 'Erros corrigidos automaticamente'}: ${r.attempts.map((a) => esc(String(a.error).slice(0, 140))).join(' · ')}</div>` : ''}
       ${r.result ? '<div class="ai-result" data-grid></div>' : ''}`;
 
@@ -113,6 +119,23 @@
       window.location.href = QD.url('/editor?' + qs.toString());
     });
     body.querySelector('[data-a="run"]')?.addEventListener('click', (e) => { e.preventDefault(); send(question, { mode: 'run', sql: currentSql(), card: el }); });
+    body.querySelector('[data-a="edit"]')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      const pre = body.querySelector('[data-pre]');
+      pre.replaceWith(QD.h(`<textarea spellcheck="false" data-sql>${esc(r.sql)}</textarea>`));
+      body.querySelector('details').open = true;
+      body.querySelector('[data-a="run"]').classList.remove('hidden');
+      e.currentTarget.remove();
+      body.querySelector('[data-sql]').focus();
+    });
+    body.querySelector('[data-a="learn"]')?.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const b = e.currentTarget;
+      try {
+        await QD.post('/api/assistant/examples', { connection_id: c.id, question, sql: r.sql });
+        b.outerHTML = `<span class="badge success">${icon('check', 'sm')} Guardado — a IA vai usar este exemplo</span>`;
+      } catch (err) { QD.fail(err); }
+    });
     function currentSql() { return body.querySelector('[data-sql]')?.value ?? r.sql; }
     scrollDown();
   }
@@ -171,6 +194,85 @@
     if (s) send(s.textContent.trim());
   });
   $('[data-clear]').addEventListener('click', () => { turns = []; window.location.href = QD.url('/assistant'); });
+
+  /* ---------- knowledge (notes, examples, structure) ---------- */
+  let canTeach = true;
+  async function knowledgeModal() {
+    const c = conn();
+    if (!c) return;
+    const database = dbSel.value || '';
+    const m = QD.modal({ title: `Conhecimento da IA — ${c.name}`, size: 'xl', body: '<div class="empty"><span class="spinner lg"></span></div>' });
+    let k;
+    try { k = await QD.get('/api/assistant/knowledge', { connection_id: c.id, database }); } catch (e) { m.body.innerHTML = `<div class="alert error">${esc(e.message)}</div>`; return; }
+    canTeach = k.can_teach;
+    const ro = k.can_teach ? '' : 'disabled';
+    m.body.innerHTML = `
+      <div class="row wrap mb" style="gap:10px">
+        <span class="badge accent">${icon('database', 'sm')} Estrutura lida: <b data-k-tables>${k.tables ?? '?'}</b>&nbsp;tabelas/views</span>
+        <button class="btn sm" data-k-refresh>${icon('refresh', 'sm')} Reler estrutura</button>
+        <span class="muted small">A IA recebe sempre a estrutura (tabelas, colunas, chaves). Em bases grandes escolhe primeiro as tabelas relevantes.</span>
+      </div>
+      <div class="field-label">Notas sobre esta base de dados <span class="muted">(a IA lê-as em todas as perguntas)</span></div>
+      <textarea class="input mono" rows="12" data-k-notes ${ro} placeholder="Explique o significado do negócio, por exemplo:
+- clientes = tabela users onde user_group_id = ... (os utilizadores administradores não contam)
+- movimentos / transações = tabela transfers (date = data, amount = valor, from_id/to_id -> accounts.id)
+- accounts.owner_id -> users.id
+- 'faturou' = soma de transfers.amount recebida
+- valores em euros; datas em UTC">${esc(k.notes || '')}</textarea>
+      <div class="row mt" style="gap:8px">
+        ${k.can_teach ? `<button class="btn primary sm" data-k-save>${icon('save', 'sm')} Guardar notas</button>
+        <button class="btn sm" data-k-describe title="A IA analisa a estrutura e escreve um rascunho — reveja antes de guardar">${icon('sparkles', 'sm')} Gerar rascunho com a IA</button>` : '<span class="muted small">Só editores/administradores podem alterar o conhecimento.</span>'}
+        <span class="muted small" data-k-status></span>
+      </div>
+      <div class="field-label" style="margin-top:22px">Exemplos aprendidos (${k.examples.length}) <span class="muted">— pergunta + SQL correto; usados em perguntas parecidas</span></div>
+      <div data-k-examples>${k.examples.length ? k.examples.map((e) => `<div class="list-item" style="padding:8px 4px;align-items:flex-start" data-ex="${e.id}">
+          <div class="grow"><b>${esc(e.question)}</b><span class="sql-snippet" style="max-width:100%">${esc(e.sql_text.replace(/\s+/g, ' '))}</span>
+          <div class="muted" style="font-size:11px">${esc(e.creator_name || '')} · ${QD.fmt.ago(e.created_at)}</div></div>
+          ${k.can_teach ? `<button class="btn-icon sm" data-ex-del="${e.id}" title="Remover">${icon('trash', 'sm')}</button>` : ''}</div>`).join('')
+        : '<div class="muted small">Ainda sem exemplos. Depois de uma resposta certa, carregue em <b>Correto — ensinar à IA</b>.</div>'}</div>`;
+    const status = m.body.querySelector('[data-k-status]');
+    m.body.querySelector('[data-k-refresh]').addEventListener('click', async (e) => {
+      e.currentTarget.disabled = true;
+      status.innerHTML = '<span class="spinner"></span> a ler a estrutura…';
+      try {
+        const r = await QD.post('/api/assistant/refresh-schema', { connection_id: c.id, database });
+        if (!r.ok) throw new Error(r.error);
+        m.body.querySelector('[data-k-tables]').textContent = r.tables;
+        status.textContent = 'Estrutura atualizada.';
+      } catch (err) { status.textContent = ''; QD.fail(err); }
+      e.currentTarget.disabled = false;
+    });
+    m.body.querySelector('[data-k-save]')?.addEventListener('click', async () => {
+      try {
+        await QD.post('/api/assistant/knowledge', { connection_id: c.id, notes: m.body.querySelector('[data-k-notes]').value });
+        status.textContent = 'Notas guardadas.';
+        QD.toast('Notas guardadas — a IA vai usá-las a partir de agora.', 'success');
+      } catch (err) { QD.fail(err); }
+    });
+    m.body.querySelector('[data-k-describe]')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      status.innerHTML = '<span class="spinner"></span> a IA está a analisar a estrutura (pode demorar)…';
+      try {
+        const r = await QD.post('/api/assistant/describe', { connection_id: c.id, database, model: modelSel.value });
+        if (!r.ok) throw new Error(r.error);
+        const ta = m.body.querySelector('[data-k-notes]');
+        ta.value = (ta.value.trim() ? ta.value.trim() + '\n\n' : '') + r.notes.trim();
+        status.textContent = 'Rascunho gerado — reveja, corrija e carregue em Guardar notas.';
+      } catch (err) { status.textContent = ''; QD.fail(err); }
+      btn.disabled = false;
+    });
+    m.body.querySelector('[data-k-examples]').addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-ex-del]');
+      if (!b) return;
+      try {
+        await QD.delete(`/api/assistant/examples/${b.dataset.exDel}?connection_id=${c.id}`, {});
+        b.closest('[data-ex]').remove();
+      } catch (err) { QD.fail(err); }
+    });
+  }
+  $('[data-knowledge]').addEventListener('click', knowledgeModal);
+  QD.get('/api/assistant/knowledge', { connection_id: +connSel.value || 0 }).then((k) => { canTeach = k.can_teach; }).catch(() => {});
 
   if (D.boot.question) send(D.boot.question);
   input.focus();

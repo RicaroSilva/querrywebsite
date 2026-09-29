@@ -271,7 +271,9 @@ docker compose up -d --build        # http://localhost:8080
 | `AI_TIMEOUT_SECONDS` / `AI_TEMPERATURE` | 120 / 0.1 | Timeout de cada pedido à IA e temperatura |
 | `AI_MAX_ATTEMPTS` | 3 | Tentativas (correção automática de SQL com erro) |
 | `AI_SEND_RESULTS` / `AI_RESULT_ROWS` | true / 50 | Enviar linhas do resultado ao modelo para escrever a resposta |
-| `AI_QUERY_MAX_ROWS` / `AI_SCHEMA_MAX_TABLES` | 1000 / 150 | Limites das queries da IA e do esquema no prompt |
+| `AI_QUERY_MAX_ROWS` | 1000 | Máximo de linhas das queries da IA |
+| `AI_SCHEMA_MAX_CHARS` | 30000 | Acima disto a IA escolhe primeiro as tabelas relevantes |
+| `AI_NUM_CTX` | | Janela de contexto a pedir ao Ollama (ex.: 32768) |
 
 ---
 
@@ -411,8 +413,20 @@ pergunta ─▶ esquema da BD (tabelas, colunas, PK, FK — cache 10 min) + perg
 * Cada pergunta fica no **histórico** (a query executada) e nos **logs de auditoria** (`assistant.ask`).
 * Modelos recomendados para SQL: `qwen2.5-coder` 7B/14B/32B, `llama3.1:8b`+, `deepseek-coder-v2`;
   modelos < 7B erram com frequência em JOINs. Modelos de raciocínio (`<think>…</think>`) são suportados.
-* Bases de dados muito grandes: o prompt inclui até `AI_SCHEMA_MAX_TABLES` tabelas; nomes de tabelas e
-  colunas claros (ou comentários) melhoram muito os resultados.
+* **Bases de dados grandes (ex.: Cyclos, centenas de tabelas):** se o esquema completo passar
+  `AI_SCHEMA_MAX_CHARS`, a IA recebe primeiro um catálogo compacto (tabela, nº aproximado de linhas, colunas)
+  e escolhe as tabelas relevantes; só essas (mais as ligadas por FK) seguem em detalhe para escrever o SQL.
+  Em cada erro, a IA recebe as colunas exatas das tabelas que usou.
+* **Ensinar a IA (botão *Conhecimento*, por conexão):**
+  * **Notas** — texto livre com o significado do negócio ("clientes = users com user_group_id = 2",
+    "movimentos = transfers", "faturou = soma de amount recebido"). Enviadas em todas as perguntas.
+    O botão *Gerar rascunho com a IA* escreve uma primeira versão a partir da estrutura, para rever.
+  * **Exemplos** — em cada resposta certa, *Correto — ensinar à IA* guarda a pergunta + SQL; as perguntas
+    parecidas recebem esses exemplos. Uma resposta errada pode ser corrigida em *Corrigir SQL* → *Executar* → ensinar.
+  * *Reler estrutura* depois de alterações ao esquema (a estrutura é guardada em cache 1 hora).
+* **Contexto do modelo:** o Ollama usa por omissão uma janela pequena e corta prompts longos em silêncio.
+  No Open WebUI defina *Workspace → Models → (modelo) → Advanced Params → Context Length* (ex.: 32768),
+  ou use `AI_NUM_CTX=32768`.
 * Se o Open WebUI estiver noutra máquina/contentor, o servidor do QueryDeck tem de o conseguir alcançar
   (em Docker use o nome do serviço ou `host.docker.internal`, não `localhost`).
 
@@ -454,7 +468,8 @@ app/
     ├── Queries/             queries guardadas, pastas, favoritos, tags
     ├── History/
     ├── Reports/             relatórios, componentes, filtros
-    ├── Assistant/           AiClient (API OpenAI-compatível), AssistantService (texto → SQL → resposta)
+    ├── Assistant/           AiClient (API OpenAI-compatível), AssistantService (texto → SQL → resposta),
+    │                        SchemaCatalog (estrutura + seleção de tabelas), KnowledgeRepository (notas/exemplos)
     ├── Users/  Settings/  Logs/
 config/                      app.php, database.php, query.php, permissions.php (role → permissões)
 database/migrations/         SQL portável MySQL/SQLite (tokens {id} {fk} {engine})

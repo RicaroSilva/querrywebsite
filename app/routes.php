@@ -61,6 +61,12 @@ return static function (Router $r): void {
     $r->get('/assistant', [AssistantController::class, 'index'], ['can' => 'assistant.use']);
     $r->post('/api/assistant/ask', [AssistantController::class, 'ask'], ['can' => 'assistant.use']);
     $r->get('/api/assistant/status', [AssistantController::class, 'status'], ['can' => 'assistant.use']);
+    $r->get('/api/assistant/knowledge', [AssistantController::class, 'knowledge'], ['can' => 'assistant.use']);
+    $r->post('/api/assistant/knowledge', [AssistantController::class, 'saveNotes'], ['can' => 'assistant.teach']);
+    $r->post('/api/assistant/examples', [AssistantController::class, 'addExample'], ['can' => 'assistant.teach']);
+    $r->delete('/api/assistant/examples/{id}', [AssistantController::class, 'deleteExample'], ['can' => 'assistant.teach']);
+    $r->post('/api/assistant/refresh-schema', [AssistantController::class, 'refreshSchema'], ['can' => 'assistant.use']);
+    $r->post('/api/assistant/describe', [AssistantController::class, 'describe'], ['can' => 'assistant.teach']);
 
     // Saved queries, folders, favourites
     $r->get('/queries', [QueryController::class, 'index'], ['can' => 'queries.view']);

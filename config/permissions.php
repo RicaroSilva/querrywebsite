@@ -18,7 +18,7 @@ return [
         'queries.view', 'queries.manage',
         'reports.view', 'reports.manage',
         'history.view', 'export.run',
-        'assistant.use',
+        'assistant.use', 'assistant.teach',
     ],
     'readonly' => [
         'dashboard.view',

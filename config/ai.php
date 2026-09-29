@@ -17,6 +17,10 @@ return [
     'send_results' => (bool) env('AI_SEND_RESULTS', true),      // send result rows to the model to write the answer
     'result_rows'  => (int) env('AI_RESULT_ROWS', 50),          // max rows sent to the model
     'max_rows'     => (int) env('AI_QUERY_MAX_ROWS', 1000),     // max rows fetched by AI-generated queries
-    'schema_tables'=> (int) env('AI_SCHEMA_MAX_TABLES', 150),   // max tables described in the prompt
+    // Schemas bigger than this (characters) are narrowed to the relevant tables first (2-step)
+    'schema_chars' => (int) env('AI_SCHEMA_MAX_CHARS', 30000),
+    // Context window hint for Ollama-backed models (e.g. 32768); empty = model default.
+    // With Open WebUI prefer setting "Context Length" in the model's Advanced Params.
+    'num_ctx'      => (int) env('AI_NUM_CTX', 0),
     'verify_tls'   => (bool) env('AI_VERIFY_TLS', true),
 ];

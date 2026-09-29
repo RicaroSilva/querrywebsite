@@ -15,6 +15,7 @@ View::push('scripts', 'js/assistant.js');
         </div>
         <div class="conn-select hidden" data-db-wrap title="Database"><?= icon('layers', 'sm') ?><select class="select" data-db style="min-width:120px"></select></div>
         <div class="conn-select" title="Modelo da IA"><?= icon('sparkles', 'sm') ?><select class="select" data-model style="min-width:160px"><option value="<?= e($ai['model']) ?>"><?= e($ai['model'] ?: '(modelo)') ?></option></select></div>
+        <button class="btn sm" data-knowledge title="O que a IA sabe sobre esta base de dados: notas, exemplos e estrutura"><?= icon('layers', 'sm') ?> Conhecimento</button>
         <label class="check small" title="Mostra o SQL gerado e só executa quando carregar em Executar"><input type="checkbox" data-review> Rever SQL antes de executar</label>
         <div class="spacer"></div>
         <span class="row small muted" data-ai-status><span class="spinner"></span> a verificar IA…</span>
