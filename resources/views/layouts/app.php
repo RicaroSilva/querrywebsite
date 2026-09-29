@@ -13,6 +13,7 @@ $nav = [
         ['dashboard', 'Dashboard', '/', 'dashboard', 'dashboard.view'],
         ['databases', 'Bases de Dados', '/explorer', 'database', 'connections.view'],
         ['editor', 'SQL Editor', '/editor', 'terminal', 'queries.execute'],
+        ['assistant', 'Assistente IA', '/assistant', 'sparkles', 'assistant.use'],
     ],
     'Biblioteca' => [
         ['queries', 'Queries', '/queries', 'file-code', 'queries.view'],
@@ -36,6 +37,7 @@ $boot = [
         'save'    => Auth::can('queries.manage'),
         'conns'   => Auth::can('connections.manage'),
         'reports' => Auth::can('reports.manage'),
+        'ai'      => Auth::can('assistant.use') && (bool) config('ai.enabled'),
     ],
     'icons' => App\Core\Icons::all(),
 ];

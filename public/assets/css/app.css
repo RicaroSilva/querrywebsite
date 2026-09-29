@@ -711,3 +711,32 @@ li.CodeMirror-hint-active { background: var(--accent); color: var(--accent-contr
   background: color-mix(in srgb, var(--code-bg) 85%, transparent); padding: 1px 6px; border-radius: 5px; font-variant-numeric: tabular-nums; }
 input.input[type=color] { width: 64px; padding: 3px; cursor: pointer; }
 @media (max-width: 860px) { .hide-sm { display: none !important; } }
+
+/* ------------------------------------------------------------ AI assistant */
+.assistant { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; }
+.assistant-bar { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; background: var(--surface-glass); }
+.assistant-bar .spacer { flex: 1; }
+.assistant-scroll { flex: 1; overflow-y: auto; min-height: 0; }
+.assistant-feed { max-width: 1040px; margin: 0 auto; padding: 24px 20px 12px; display: flex; flex-direction: column; gap: 18px; }
+.assistant-empty { text-align: center; padding: 8vh 10px 0; }
+.assistant-empty h2 { margin: 0 0 6px; font-size: 20px; letter-spacing: -.02em; }
+.msg-user { align-self: flex-end; max-width: 75%; background: var(--accent); color: var(--accent-contrast); padding: 10px 14px; border-radius: 14px 14px 4px 14px; white-space: pre-wrap; animation: rise .25s ease both; }
+.msg-ai { align-self: stretch; animation: rise .25s ease both; }
+.msg-ai .ai-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--text-3); font-size: 12px; }
+.msg-ai .ai-head .brand-mark { width: 24px; height: 24px; border-radius: 7px; }
+.msg-ai .ai-head .brand-mark .icon { width: 13px; height: 13px; }
+.ai-answer { font-size: 14.5px; line-height: 1.6; color: var(--text); }
+.ai-answer p { margin: .3em 0; }
+.ai-answer.failed { color: var(--danger); }
+.ai-thinking { display: flex; align-items: center; gap: 10px; color: var(--text-2); }
+.ai-sql { margin-top: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--code-bg); overflow: hidden; }
+.ai-sql summary { cursor: pointer; padding: 8px 12px; font-size: 12px; color: var(--text-2); display: flex; align-items: center; gap: 8px; list-style: none; user-select: none; }
+.ai-sql summary::-webkit-details-marker { display: none; }
+.ai-sql summary .spacer { flex: 1; }
+.ai-sql pre { margin: 0; padding: 10px 14px 14px; white-space: pre-wrap; font-size: 12.5px; color: var(--text); border-top: 1px solid var(--border); }
+.ai-sql textarea { width: 100%; min-height: 120px; border: 0; border-top: 1px solid var(--border); background: transparent; color: var(--text); padding: 10px 14px; font: 12.5px/1.6 "JetBrains Mono", monospace; resize: vertical; outline: none; }
+.ai-attempts { font-size: 11.5px; color: var(--text-3); margin-top: 6px; }
+.ai-result { margin-top: 10px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; max-height: 380px; background: var(--surface); }
+.assistant-input { display: flex; gap: 8px; align-items: flex-end; max-width: 1040px; width: 100%; margin: 0 auto; padding: 12px 20px 18px; }
+.assistant-input textarea { min-height: 44px; max-height: 180px; resize: none; font-size: 14px; padding: 11px 14px; border-radius: 12px; }
+.assistant-input .btn { height: 44px; border-radius: 12px; }

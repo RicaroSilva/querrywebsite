@@ -23,7 +23,7 @@ diariamente com dados.
 6. [Docker](#6-docker)
 7. [Configuração (.env)](#7-configuração-env)
 8. [Configurar as bases de dados externas](#8-configurar-as-bases-de-dados-externas)
-9. [Utilização](#9-utilização)
+9. [Utilização](#9-utilização) · [Assistente IA (Open WebUI)](#assistente-ia-open-webui--ollama--lm-studio)
 10. [Arquitetura](#10-arquitetura)
 11. [Segurança](#11-segurança)
 12. [Performance e grandes volumes](#12-performance-e-grandes-volumes)
@@ -54,6 +54,7 @@ diariamente com dados.
 | **Utilizadores** | Perfis Administrador, Editor e Só leitura; gestão de utilizadores pelos admins. Estrutura de *roles*, *permissions* e acesso por conexão já criada na BD. |
 | **Definições** | Tema (escuro/claro/sistema), tamanho da fonte do editor, linhas por página, autocomplete, confirmações de segurança, perfil, password, limites, drivers disponíveis. |
 | **Logs** | Auditoria de login/falhas, conexões (criar/editar/eliminar/testar), queries, relatórios, exportações, utilizadores. |
+| **Assistente IA** | Perguntas em linguagem natural ("qual a pessoa que mais faturou?") respondidas com a sua IA local (Open WebUI, Ollama, LM Studio…): gera o SQL a partir do esquema, executa **em só-leitura**, corrige erros automaticamente e responde em português, com o SQL e a tabela de resultados (exportável). Modo "rever SQL antes de executar", perguntas de seguimento e botão **IA** (Ctrl+I) no editor. |
 | **Design** | Dark mode por defeito + light mode, glassmorphism subtil, sidebar recolhível, paleta de comandos (**Ctrl+K**), animações suaves, responsivo (mobile). |
 
 ---
@@ -208,6 +209,13 @@ docker compose up -d --build        # http://localhost:8080
 | `HISTORY_RETENTION_DAYS` | 180 | Usado por `history:prune` |
 | `SQLITE_ALLOWED_DIRS` | storage/sqlite | Pastas (separadas por vírgula) onde podem estar ficheiros SQLite ligáveis |
 | `SEED_DEMO` | true | Criar dados de demonstração na instalação |
+| `AI_ENABLED` | false | Ativa o Assistente IA |
+| `AI_BASE_URL` | http://localhost:3000/api | API compatível com OpenAI (Open WebUI: `…/api`; Ollama: `…:11434/v1`) |
+| `AI_API_KEY` / `AI_MODEL` | | Chave (Open WebUI) e id do modelo |
+| `AI_TIMEOUT_SECONDS` / `AI_TEMPERATURE` | 120 / 0.1 | Timeout de cada pedido à IA e temperatura |
+| `AI_MAX_ATTEMPTS` | 3 | Tentativas (correção automática de SQL com erro) |
+| `AI_SEND_RESULTS` / `AI_RESULT_ROWS` | true / 50 | Enviar linhas do resultado ao modelo para escrever a resposta |
+| `AI_QUERY_MAX_ROWS` / `AI_SCHEMA_MAX_TABLES` | 1000 / 150 | Limites das queries da IA e do esquema no prompt |
 
 ---
 
@@ -314,6 +322,44 @@ concatenados no SQL. Não coloque aspas à volta do marcador.
 4. **⋯ → Nome, descrição e filtros** define filtros (`texto`, `número`, `data`, `lista`) usados como `{{nome}}`.
 5. **PDF** usa a impressão do browser (layout de impressão dedicado). O SQL dos relatórios corre sempre em modo só de leitura.
 
+### Assistente IA (Open WebUI / Ollama / LM Studio)
+
+O QueryDeck liga-se a qualquer IA com API compatível com OpenAI. Com o **Open WebUI**:
+
+1. No Open WebUI: **Settings → Account → API Keys → Create new secret key** (em algumas versões o admin tem de
+   ativar *Enable API Key* em *Admin Settings → General*).
+2. No `.env` do QueryDeck:
+   ```env
+   AI_ENABLED=true
+   AI_BASE_URL=http://localhost:3000/api      # URL do Open WebUI + /api
+   AI_API_KEY=sk-xxxxxxxxxxxxxxxx
+   AI_MODEL=qwen2.5-coder:14b                 # o id do modelo tal como aparece no Open WebUI
+   ```
+   (Ollama direto: `AI_BASE_URL=http://localhost:11434/v1`, sem key. LM Studio: `http://localhost:1234/v1`.)
+3. **Definições → Assistente IA → Testar ligação** confirma a ligação e lista os modelos disponíveis.
+4. Use a página **Assistente IA** ou, no SQL Editor, o botão **IA** (`Ctrl+I`) que escreve o SQL numa tab.
+
+Como funciona uma pergunta:
+
+```text
+pergunta ─▶ esquema da BD (tabelas, colunas, PK, FK — cache 10 min) + pergunta ─▶ IA escreve SQL
+        ─▶ validação: 1 statement, só-leitura ─▶ execução em sessão só-leitura (limite AI_QUERY_MAX_ROWS)
+        ─▶ erro? o erro volta à IA para corrigir (até AI_MAX_ATTEMPTS)
+        ─▶ resultado (até AI_RESULT_ROWS linhas) ─▶ IA escreve a resposta em português
+```
+
+* **O SQL gerado nunca pode alterar dados**: é recusado se não for uma única leitura e corre sempre em
+  modo só-leitura (mesmas proteções do resto da aplicação), mesmo para utilizadores com permissão de escrita.
+* A API key fica apenas no servidor; o browser nunca fala diretamente com a IA.
+* `AI_SEND_RESULTS=false` faz com que o modelo veja **apenas o esquema**, nunca os dados (a resposta passa a ser só a tabela).
+* Cada pergunta fica no **histórico** (a query executada) e nos **logs de auditoria** (`assistant.ask`).
+* Modelos recomendados para SQL: `qwen2.5-coder` 7B/14B/32B, `llama3.1:8b`+, `deepseek-coder-v2`;
+  modelos < 7B erram com frequência em JOINs. Modelos de raciocínio (`<think>…</think>`) são suportados.
+* Bases de dados muito grandes: o prompt inclui até `AI_SCHEMA_MAX_TABLES` tabelas; nomes de tabelas e
+  colunas claros (ou comentários) melhoram muito os resultados.
+* Se o Open WebUI estiver noutra máquina/contentor, o servidor do QueryDeck tem de o conseguir alcançar
+  (em Docker use o nome do serviço ou `host.docker.internal`, não `localhost`).
+
 ### Confirmações de segurança
 
 Antes de executar, o editor pede confirmação para `UPDATE`/`DELETE` sem `WHERE`, `DROP`/`TRUNCATE` e para
@@ -352,6 +398,7 @@ app/
     ├── Queries/             queries guardadas, pastas, favoritos, tags
     ├── History/
     ├── Reports/             relatórios, componentes, filtros
+    ├── Assistant/           AiClient (API OpenAI-compatível), AssistantService (texto → SQL → resposta)
     ├── Users/  Settings/  Logs/
 config/                      app.php, database.php, query.php, permissions.php (role → permissões)
 database/migrations/         SQL portável MySQL/SQLite (tokens {id} {fk} {engine})

@@ -65,6 +65,18 @@ $p = $prefs + ['theme' => 'dark', 'editor_font' => '13', 'page_size' => (string)
                 </table>
             </div>
             <div class="card">
+                <div class="card-head"><h2><?= icon('sparkles', 'sm') ?> Assistente IA</h2><span class="sub">definido no .env (AI_*)</span><div class="spacer"></div>
+                    <?php if (config('ai.enabled')): ?><button class="btn sm" data-ai-test><?= icon('zap', 'sm') ?> Testar ligação</button><?php endif; ?></div>
+                <table class="table compact">
+                    <tr><td>Estado</td><td><?= config('ai.enabled') ? '<span class="badge success">ativo</span>' : '<span class="badge">desativado (AI_ENABLED=false)</span>' ?></td></tr>
+                    <tr><td>Endpoint</td><td class="mono small"><?= e(config('ai.base_url')) ?></td></tr>
+                    <tr><td>Modelo</td><td class="mono small"><?= e(config('ai.model') ?: '—') ?></td></tr>
+                    <tr><td>API key</td><td class="small"><?= config('ai.api_key') ? 'configurada' : '—' ?></td></tr>
+                    <tr><td>Enviar resultados ao modelo</td><td class="small"><?= config('ai.send_results') ? 'sim (até ' . (int) config('ai.result_rows') . ' linhas)' : 'não — só o esquema' ?></td></tr>
+                </table>
+                <div class="card-body small" data-ai-result style="padding-top:0"></div>
+            </div>
+            <div class="card">
                 <div class="card-head"><h2><?= icon('database', 'sm') ?> Drivers</h2></div>
                 <table class="table compact">
                     <?php foreach ($drivers as $d): ?>

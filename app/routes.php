@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 use App\Core\Router;
+use App\Modules\Assistant\AssistantController;
 use App\Modules\Auth\AuthController;
 use App\Modules\Connections\ConnectionController;
 use App\Modules\Dashboard\DashboardController;
@@ -55,6 +56,11 @@ return static function (Router $r): void {
 
     // Exports (streamed downloads)
     $r->post('/export', [ExportController::class, 'export'], ['can' => 'export.run']);
+
+    // AI assistant (natural language → read-only SQL → answer)
+    $r->get('/assistant', [AssistantController::class, 'index'], ['can' => 'assistant.use']);
+    $r->post('/api/assistant/ask', [AssistantController::class, 'ask'], ['can' => 'assistant.use']);
+    $r->get('/api/assistant/status', [AssistantController::class, 'status'], ['can' => 'assistant.use']);
 
     // Saved queries, folders, favourites
     $r->get('/queries', [QueryController::class, 'index'], ['can' => 'queries.view']);

@@ -45,6 +45,7 @@
       'Shift-Ctrl-Enter': () => run('selection'), 'Shift-Cmd-Enter': () => run('selection'),
       'Ctrl-S': () => save(false), 'Cmd-S': () => save(false),
       'Shift-Ctrl-F': () => format(), 'Shift-Cmd-F': () => format(),
+      'Ctrl-I': () => QD.boot.can.ai && aiGenerate(), 'Cmd-I': () => QD.boot.can.ai && aiGenerate(),
       'Ctrl-/': 'toggleComment', 'Cmd-/': 'toggleComment',
       'Ctrl-Space': (c) => c.showHint({ completeSingle: false }),
       Tab: (c) => (c.somethingSelected() ? c.indentSelection('add') : c.replaceSelection('    ', 'end')),
@@ -634,9 +635,28 @@
     run('all', prefix + st.sql.replace(/;\s*$/, ''));
   }
 
+  /** Natural language → SQL (generated only; the user reviews and runs it). */
+  async function aiGenerate() {
+    const t = tab();
+    const c = conn(t.connectionId);
+    if (!c) return QD.toast('Selecione uma conexão primeiro.', 'error');
+    const question = await QD.prompt('Perguntar à IA', '', { label: `O que quer saber de "${c.name}"?`, placeholder: 'Ex.: top 10 clientes por faturação este ano' });
+    if (!question) return;
+    QD.toast('A IA está a escrever o SQL…', 'info', 2500);
+    try {
+      const r = await QD.post('/api/assistant/ask', { connection_id: c.id, database: t.database || '', question, mode: 'generate' });
+      if (!r.ok) throw new Error(r.error);
+      if (!r.sql) return QD.toast(r.answer || 'A IA não devolveu SQL.', 'error', 7000);
+      const sql = `-- ${question.replace(/\n/g, ' ')}\n${r.explanation ? '-- ' + r.explanation.replace(/\n/g, ' ') + '\n' : ''}${r.sql};`;
+      const cur = t.doc.getValue().trim();
+      if (!cur) { t.doc.setValue(sql); } else { newTab({ title: 'IA: ' + question.slice(0, 24), sql, connectionId: c.id, database: t.database || '' }); }
+      QD.toast('SQL gerado — reveja e execute com Ctrl+Enter.', 'success');
+    } catch (e) { QD.fail(e); }
+  }
+
   function shortcuts() {
     const rows = [['Ctrl + Enter / F5', 'Executar tudo'], ['Ctrl + Shift + Enter', 'Executar seleção / statement atual'], ['Esc', 'Cancelar execução'],
-      ['Ctrl + S', 'Guardar query'], ['Ctrl + Shift + F', 'Formatar SQL'], ['Ctrl + /', 'Comentar / descomentar'], ['Ctrl + Espaço', 'Autocomplete'],
+      ['Ctrl + S', 'Guardar query'], ['Ctrl + Shift + F', 'Formatar SQL'], ['Ctrl + I', 'Perguntar à IA (gera SQL)'], ['Ctrl + /', 'Comentar / descomentar'], ['Ctrl + Espaço', 'Autocomplete'],
       ['Alt + N', 'Nova tab'], ['Alt + W', 'Fechar tab'], ['Alt + ← / →', 'Tab anterior / seguinte'], ['Ctrl + K', 'Paleta de comandos'],
       ['Duplo clique (árvore)', 'Inserir nome do objeto'], ['Duplo clique (célula)', 'Ver valor completo']];
     QD.modal({ title: 'Atalhos de teclado', body: `<table class="table compact">${rows.map(([k, v]) => `<tr><td><kbd>${esc(k)}</kbd></td><td>${esc(v)}</td></tr>`).join('')}</table>`, buttons: [{ label: 'Fechar', cls: 'primary' }] });
@@ -647,7 +667,7 @@
     if (!b) return;
     ({
       run: () => run('all'), 'run-selection': () => run('selection'), cancel, format, save: () => save(false), 'save-as': () => save(true),
-      'to-report': toReport, explain, shortcuts, comment: () => cm.toggleComment(),
+      'to-report': toReport, explain, shortcuts, ai: aiGenerate, comment: () => cm.toggleComment(),
       'toggle-side': () => { ide.classList.toggle(window.innerWidth <= 1100 ? 'side-open' : 'side-hidden'); setTimeout(() => cm.refresh(), 50); },
     }[b.dataset.cmd] || (() => {}))();
   });

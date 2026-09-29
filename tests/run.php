@@ -217,6 +217,51 @@ test('migrations, execution, result paging and history', function () {
     @unlink($file);
 });
 
+echo "AI assistant\n";
+test('extracts SQL from fenced blocks, JSON and plain replies', function () {
+    [$sql, $exp] = App\Modules\Assistant\AssistantService::extractSql("Aqui está:\n```sql\nSELECT 1;\n```\nSimples.");
+    eq('SELECT 1', $sql);
+    ok(str_contains((string) $exp, 'Simples'));
+    eq('SELECT 2', App\Modules\Assistant\AssistantService::extractSql('{"sql":"SELECT 2","explanation":"x"}')[0]);
+    eq('WITH a AS (SELECT 1) SELECT * FROM a', App\Modules\Assistant\AssistantService::extractSql("WITH a AS (SELECT 1) SELECT * FROM a;\n\nfeito")[0]);
+    eq(null, App\Modules\Assistant\AssistantService::extractSql('Não sei.')[0]);
+});
+test('blocks writes, auto-fixes SQL errors and answers', function () {
+    $db = App\Core\Database::get();
+    $file = storage_path('sqlite') . '/ai-' . getmypid() . '.sqlite';
+    $pdo = new PDO('sqlite:' . $file);
+    $pdo->exec("CREATE TABLE sales (person TEXT, amount NUMERIC); INSERT INTO sales VALUES ('Ana', 10), ('Rui', 30), ('Ana', 5)");
+    $pdo = null;
+    $cid = $db->insert('connections', ['name' => 'AI', 'driver' => 'sqlite', 'database_name' => $file, 'options' => '{}',
+        'environment' => 'local', 'read_only' => 0, 'created_at' => now(), 'updated_at' => now()]);
+    $conn = (new App\Modules\Connections\ConnectionRepository())->find($cid);
+    $fake = new class () extends App\Modules\Assistant\AiClient {
+        public array $calls = [];
+        public function __construct() {}
+        public function chat(array $messages, string $model, float $temperature = 0.1): string
+        {
+            $this->calls[] = $messages;
+            $n = count($this->calls);
+            return match ($n) {
+                1 => "```sql\nDELETE FROM sales\n```",                         // refused (write)
+                2 => "```sql\nSELECT person, SUM(amont) FROM sales GROUP BY 1\n```", // SQL error → fed back
+                3 => "```sql\nSELECT person, SUM(amount) AS total FROM sales GROUP BY person ORDER BY total DESC LIMIT 1\n```",
+                default => 'Foi o Rui, com 30.',
+            };
+        }
+    };
+    $uid = (int) $db->value('SELECT MIN(id) FROM users');
+    $r = (new App\Modules\Assistant\AssistantService($fake))->ask($conn, null, 'Quem mais faturou?', [], $uid, 'ask', null, 'm');
+    eq('Foi o Rui, com 30.', $r['answer']);
+    eq([['Rui', 30]], $r['result']['rows']);
+    eq(2, count($r['attempts']));
+    ok(str_contains($r['attempts'][0]['error'], 'read-only'), 'write refused');
+    ok(str_contains($fake->calls[0][0]['content'], 'TABLE sales(person TEXT, amount NUMERIC)'), 'schema in prompt');
+    ok(str_contains(end($fake->calls)[1]['content'], "Rui\t30"), 'result rows sent for the answer');
+    eq(3, (int) (new PDO('sqlite:' . $file))->query('SELECT COUNT(*) FROM sales')->fetchColumn(), 'data untouched');
+    @unlink($file);
+});
+
 @unlink((string) getenv('APP_DB_SQLITE_PATH'));
 echo "\n" . ($failed ? "\e[31m" . count($failed) . " failed\e[0m, " : '') . "\e[32m$passed passed\e[0m\n";
 exit($failed ? 1 : 0);

@@ -28,6 +28,17 @@
     } catch (e) { QD.fail(e); QD.showErrors(box, e); }
   });
 
+  $('[data-ai-test]')?.addEventListener('click', async () => {
+    const out = $('[data-ai-result]');
+    out.innerHTML = '<span class="spinner"></span>';
+    try {
+      const r = await QD.get('/api/assistant/status');
+      out.innerHTML = r.ok
+        ? `<span style="color:var(--success)">Ligação OK.</span> Modelos: ${r.models.map((m) => `<code>${esc(m)}</code>`).join(' ') || '—'}${r.model_found ? '' : '<br><span style="color:var(--warning)">O modelo configurado não aparece na lista.</span>'}`
+        : `<span style="color:var(--danger)">${esc(r.error)}</span>`;
+    } catch (e) { out.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`; }
+  });
+
   function userModal(u) {
     const body = QD.h(`<div class="form-grid">
       ${u ? '' : `<label class="field"><span>Nome *</span><input class="input" name="name"></label>

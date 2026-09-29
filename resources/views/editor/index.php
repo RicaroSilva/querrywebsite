@@ -42,6 +42,9 @@ View::push('scripts', 'js/editor.js');
             <button class="btn sm danger hidden" data-cmd="cancel" title="Cancelar execução"><?= icon('stop', 'sm') ?> Parar</button>
             <div class="sep"></div>
             <button class="btn-icon" data-cmd="format" title="Formatar SQL (Ctrl+Shift+F)"><?= icon('wand') ?></button>
+            <?php if (App\Core\Auth::can('assistant.use') && config('ai.enabled')): ?>
+                <button class="btn sm" data-cmd="ai" title="Descreva o que quer e a IA escreve o SQL (Ctrl+I)"><?= icon('sparkles', 'sm') ?> <span class="hide-sm">IA</span></button>
+            <?php endif; ?>
             <?php if ($canSave): ?>
                 <button class="btn-icon" data-cmd="save" title="Guardar query (Ctrl+S)"><?= icon('save') ?></button>
             <?php endif; ?>

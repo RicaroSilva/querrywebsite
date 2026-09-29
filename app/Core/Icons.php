@@ -59,6 +59,8 @@ final class Icons
         'grip'       => '<circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/>',
         'info'       => '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
         'external'   => '<path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>',
+        'sparkles'   => '<path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/><path d="M19 3v4M17 5h4M5 17v4M3 19h4"/>',
+        'send'       => '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>',
         'up'         => '<path d="m6 15 6-6 6 6"/>',
         'down'       => '<path d="m6 9 6 6 6-6"/>',
     ];
