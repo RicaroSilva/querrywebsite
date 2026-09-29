@@ -28,7 +28,12 @@ final class CsvExporter extends Exporter
 
     public function row(array $row): void
     {
-        $this->line(array_map([self::class, 'scalar'], $row));
+        $values = array_map([self::class, 'scalar'], $row);
+        if (($this->options['decimal'] ?? '.') === ',') {
+            // Excel/LibreOffice in PT/ES/FR locales expect "1234,56"
+            $values = array_map(static fn($v) => preg_match('/^-?\d+\.\d+$/', $v) ? str_replace('.', ',', $v) : $v, $values);
+        }
+        $this->line($values);
     }
 
     private function line(array $values): void

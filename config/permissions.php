@@ -19,6 +19,7 @@ return [
         'reports.view', 'reports.manage',
         'history.view', 'export.run',
         'assistant.use', 'assistant.teach',
+        'analyses.run', 'analyses.manage',
     ],
     'readonly' => [
         'dashboard.view',
@@ -28,5 +29,6 @@ return [
         'reports.view',
         'history.view', 'export.run',
         'assistant.use',            // AI-generated SQL always runs read-only
+        'analyses.run',             // analyses always run read-only
     ],
 ];

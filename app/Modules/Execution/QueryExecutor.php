@@ -81,7 +81,7 @@ final class QueryExecutor
                 }
 
                 $kw = SqlSplitter::firstKeyword($st['sql']);
-                [$stSql, $params] = $usePlaceholders ? Placeholders::bind($st['sql'], $phDefs, $phValues) : [$st['sql'], []];
+                [$stSql, $params] = $usePlaceholders ? Placeholders::bind($st['sql'], $phDefs, $phValues) : [$st['sql'], (array) ($opts['raw_params'] ?? [])];
                 $t0 = microtime(true);
                 try {
                     $cursor = $driver->open($stSql, $params, $inTransaction);

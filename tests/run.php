@@ -262,6 +262,43 @@ test('blocks writes, auto-fixes SQL errors and answers', function () {
     @unlink($file);
 });
 
+echo "Analyses\n";
+test('function call includes only filled parameters (others use DEFAULT)', function () {
+    $svc = new App\Modules\Analyses\AnalysisService();
+    $a = ['kind' => 'function', 'function_name' => 'analise_risco_transferencias', 'params' => [
+        ['name' => 'p_valor_minimo', 'type' => 'number', 'arg_type' => 'numeric', 'default' => ''],
+        ['name' => 'p_mes1', 'type' => 'integer', 'arg_type' => 'integer', 'default' => ''],
+        ['name' => 'p_ano1', 'type' => 'integer', 'arg_type' => 'integer', 'default' => '2026'],
+    ]];
+    [$sql, $p] = $svc->build($a, ['p_valor_minimo' => '500,5', 'p_mes1' => ''], 'pgsql');
+    eq('SELECT * FROM "analise_risco_transferencias"("p_valor_minimo" => ?::numeric, "p_ano1" => ?::integer)', $sql);
+    eq([500.5, 2026], $p);
+    [$sql] = $svc->build(['kind' => 'function', 'function_name' => 'f', 'params' => []], [], 'pgsql');
+    eq('SELECT * FROM "f"()', $sql);
+});
+test('rejects bad values and function names', function () {
+    $svc = new App\Modules\Analyses\AnalysisService();
+    try {
+        $svc->build(['kind' => 'function', 'function_name' => 'f', 'params' => [['name' => 'p_x', 'type' => 'number']]], ['p_x' => '1); DROP TABLE t; --'], 'pgsql');
+        throw new LogicException('accepted');
+    } catch (App\Core\HttpException $e) {
+        eq(422, $e->status);
+    }
+    try {
+        App\Modules\Analyses\AnalysisService::qualified('f(); DROP TABLE t');
+        throw new LogicException('accepted');
+    } catch (App\Core\HttpException) {
+    }
+});
+test('query templates bind {{params}} and drop empty [[optional]] blocks', function () {
+    $svc = new App\Modules\Analyses\AnalysisService();
+    $a = ['kind' => 'query', 'sql_text' => "SELECT * FROM t WHERE a >= {{min}} [[AND d >= {{desde}}]] [[AND s = {{estado}}]]",
+        'params' => [['name' => 'min', 'type' => 'number', 'default' => '10'], ['name' => 'desde', 'type' => 'date'], ['name' => 'estado', 'type' => 'text']]];
+    [$sql, $p] = $svc->build($a, ['estado' => "x' OR 1=1"], 'pgsql');
+    eq('SELECT * FROM t WHERE a >= ?  AND s = ?', $sql);
+    eq([10, "x' OR 1=1"], $p);
+});
+
 @unlink((string) getenv('APP_DB_SQLITE_PATH'));
 echo "\n" . ($failed ? "\e[31m" . count($failed) . " failed\e[0m, " : '') . "\e[32m$passed passed\e[0m\n";
 exit($failed ? 1 : 0);

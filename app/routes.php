@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 use App\Core\Router;
+use App\Modules\Analyses\AnalysisController;
 use App\Modules\Assistant\AssistantController;
 use App\Modules\Auth\AuthController;
 use App\Modules\Connections\ConnectionController;
@@ -56,6 +57,17 @@ return static function (Router $r): void {
 
     // Exports (streamed downloads)
     $r->post('/export', [ExportController::class, 'export'], ['can' => 'export.run']);
+
+    // Analyses (parameterised functions / queries with a form)
+    $r->get('/analyses', [AnalysisController::class, 'index'], ['can' => 'analyses.run']);
+    $r->get('/api/analyses', [AnalysisController::class, 'list'], ['can' => 'analyses.run']);
+    $r->post('/api/analyses', [AnalysisController::class, 'store'], ['can' => 'analyses.manage']);
+    $r->put('/api/analyses/{id}', [AnalysisController::class, 'update'], ['can' => 'analyses.manage']);
+    $r->delete('/api/analyses/{id}', [AnalysisController::class, 'destroy'], ['can' => 'analyses.manage']);
+    $r->post('/api/analyses/{id}/run', [AnalysisController::class, 'run'], ['can' => 'analyses.run']);
+    $r->post('/api/analyses/{id}/preview', [AnalysisController::class, 'preview'], ['can' => 'analyses.run']);
+    $r->get('/api/connections/{cid}/functions', [AnalysisController::class, 'functions'], ['can' => 'analyses.manage']);
+    $r->get('/api/connections/{cid}/function', [AnalysisController::class, 'describeFunction'], ['can' => 'analyses.manage']);
 
     // AI assistant (natural language → read-only SQL → answer)
     $r->get('/assistant', [AssistantController::class, 'index'], ['can' => 'assistant.use']);

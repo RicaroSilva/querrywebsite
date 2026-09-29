@@ -740,3 +740,16 @@ input.input[type=color] { width: 64px; padding: 3px; cursor: pointer; }
 .assistant-input { display: flex; gap: 8px; align-items: flex-end; max-width: 1040px; width: 100%; margin: 0 auto; padding: 12px 20px 18px; }
 .assistant-input textarea { min-height: 44px; max-height: 180px; resize: none; font-size: 14px; padding: 11px 14px; border-radius: 12px; }
 .assistant-input .btn { height: 44px; border-radius: 12px; }
+
+/* ------------------------------------------------------------ analyses */
+.analyses-layout { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 16px; align-items: start; }
+.analyses-layout > * { min-width: 0; }
+.param-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px 14px; }
+.param-grid label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 550; color: var(--text-2); }
+.param-grid .hint { font-weight: 400; font-size: 11px; color: var(--text-3); }
+.analysis-result { display: flex; flex-direction: column; max-height: 70vh; min-height: 200px; overflow: hidden; }
+.params-table td { padding: 5px 6px !important; }
+.params-table .input, .params-table .select { height: 30px; font-size: 12.5px; }
+.params-table .select { min-width: 110px; }
+.params-table td:nth-child(2) .input { min-width: 150px; }
+@media (max-width: 860px) { .analyses-layout { grid-template-columns: 1fr; } }

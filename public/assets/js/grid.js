@@ -246,6 +246,7 @@
           <label class="check"><input type="checkbox" name="header" checked> Cabeçalho</label>
           <label class="check"><input type="checkbox" name="bom"> BOM UTF-8 (Excel)</label>
           <label class="check"><input type="checkbox" name="safe"> Proteger contra fórmulas (=,+,-,@)</label>
+          <label class="check"><input type="checkbox" name="decimal_comma"> Vírgula decimal (Excel PT)</label>
         </div>
         <div data-opt="sql" class="hidden"><label class="field"><span>Tabela de destino</span><input class="input" name="table" value="${esc(grid.opts.table || 'export_table')}"></label></div>
         <div data-opt="json" class="hidden field full"><label class="check"><input type="checkbox" name="pretty"> Formatar (pretty print)</label></div>
@@ -269,6 +270,7 @@
             const d = QD.formData(body);
             QD.download('/export', {
               ...d, header: d.header ? '1' : '0', bom: d.bom ? '1' : '0', safe: d.safe ? '1' : '0', pretty: d.pretty ? '1' : '0',
+              decimal: d.decimal_comma ? ',' : '.',
               result_id: r.result_id, search: grid.search, filters: grid.filters, sort: grid.sort ?? '', dir: grid.dir,
             });
             QD.toast('Exportação iniciada — o download começa em breve.', 'info');

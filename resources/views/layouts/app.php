@@ -19,6 +19,7 @@ $nav = [
         ['queries', 'Queries', '/queries', 'file-code', 'queries.view'],
         ['favorites', 'Favoritos', '/favorites', 'star', 'queries.view'],
         ['folders', 'Pastas', '/folders', 'folder', 'queries.view'],
+        ['analyses', 'Análises', '/analyses', 'filter', 'analyses.run'],
         ['reports', 'Relatórios', '/reports', 'chart', 'reports.view'],
         ['history', 'Histórico', '/history', 'history', 'history.view'],
     ],

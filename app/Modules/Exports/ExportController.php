@@ -101,7 +101,8 @@ final class ExportController
         };
         return match ($format) {
             'csv'  => new CsvExporter(['delimiter' => $delimiter, 'header' => $request->input('header', '1') !== '0',
-                        'bom' => $request->bool('bom'), 'safe' => $request->bool('safe')]),
+                        'bom' => $request->bool('bom'), 'safe' => $request->bool('safe'),
+                        'decimal' => $request->str('decimal') === ',' ? ',' : '.']),
             'xlsx' => new XlsxExporter(['sheet' => $request->str('sheet', 'Resultados')]),
             'json' => new JsonExporter(['pretty' => $request->bool('pretty')]),
             'sql'  => new SqlExporter(['table' => $request->str('table', 'export_table'), 'dialect' => $conn['driver'] ?? 'pgsql']),

@@ -50,6 +50,7 @@ diariamente com dados.
 | **Queries guardadas** | Nome, descrição, SQL, conexão, tags, pasta, criador, datas, nº de execuções. Criar, editar, duplicar, eliminar, favoritar, pesquisar, filtrar (pasta, conexão, tag), ordenar, executar diretamente, abrir no editor. |
 | **Pastas** | Pastas encadeadas com cor; mover queries entre pastas. |
 | **Histórico** | Cada execução: utilizador, data/hora, SQL, conexão/database, tempo, nº de linhas, estado (sucesso/erro/cancelada). Filtros, pesquisa, reabrir no editor. Admins veem o histórico de todos. |
+| **Análises** | Análises parametrizadas com formulário: **funções PostgreSQL** importadas automaticamente (parâmetros, tipos e `DEFAULT` lidos da assinatura; campos vazios usam o valor por omissão da função) ou **queries SQL** com `{{parametros}}` e blocos opcionais `[[ ... ]]`. Execução só-leitura, tabela com pesquisa/filtros e download direto em **Excel** e **CSV** (`;`, vírgula decimal, UTF-8 para Excel PT). |
 | **Relatórios** | Criados do zero ou a partir de uma query guardada. Componentes: **KPI/card, tabela, barras (vertical/horizontal, empilhadas), linhas, área, pie, doughnut, texto** e **filtros** do relatório (texto, número, data, lista) ligados a `{{parametros}}` no SQL. Larguras em grelha de 12 colunas, *drag & drop*, duplicar, imprimir/PDF. |
 | **Utilizadores** | Perfis Administrador, Editor e Só leitura; gestão de utilizadores pelos admins. Estrutura de *roles*, *permissions* e acesso por conexão já criada na BD. |
 | **Definições** | Tema (escuro/claro/sistema), tamanho da fonte do editor, linhas por página, autocomplete, confirmações de segurança, perfil, password, limites, drivers disponíveis. |
@@ -430,6 +431,23 @@ pergunta ─▶ esquema da BD (tabelas, colunas, PK, FK — cache 10 min) + perg
 * Se o Open WebUI estiver noutra máquina/contentor, o servidor do QueryDeck tem de o conseguir alcançar
   (em Docker use o nome do serviço ou `host.docker.internal`, não `localhost`).
 
+### Análises (funções e queries parametrizadas)
+
+**Análises → +** (editores/administradores):
+
+* **Função PostgreSQL** — escolha a conexão e a função: o formulário é criado a partir da assinatura, por
+  exemplo `analise_risco_transferencias(p_valor_minimo numeric DEFAULT 5000, …)`. Ao executar só são enviados
+  os campos preenchidos, com notação por nome:
+  `SELECT * FROM analise_risco_transferencias(p_valor_minimo => 500, p_mes1 => 1)`; os restantes usam o
+  `DEFAULT` da função. Pode mudar rótulos, tipos, valores por omissão e tornar campos obrigatórios.
+* **Query SQL** — um `SELECT` com `{{nome}}` (valores enviados como parâmetros) e blocos opcionais
+  `[[ AND t.date >= {{desde}} ]]`, removidos quando o campo fica vazio. *Detetar parâmetros* cria o formulário.
+
+Os valores são validados pelo tipo (número, inteiro, data, texto, sim/não, lista) e a execução é sempre
+só-leitura. Os últimos valores usados ficam memorizados no browser. *Excel* / *CSV* descarregam todas as
+linhas (re-execução em streaming); *Ver SQL* mostra a chamada exata. O utilizador da BD precisa de
+`EXECUTE` na função (em PostgreSQL é concedido a `PUBLIC` por omissão) e `SELECT` nas tabelas que ela usa.
+
 ### Confirmações de segurança
 
 Antes de executar, o editor pede confirmação para `UPDATE`/`DELETE` sem `WHERE`, `DROP`/`TRUNCATE` e para
@@ -467,6 +485,7 @@ app/
     ├── Exports/             ExportController + Exporters/ (Csv, Xlsx, Json, Sql, Pdf, Markdown)
     ├── Queries/             queries guardadas, pastas, favoritos, tags
     ├── History/
+    ├── Analyses/            análises parametrizadas (funções PostgreSQL / queries com formulário)
     ├── Reports/             relatórios, componentes, filtros
     ├── Assistant/           AiClient (API OpenAI-compatível), AssistantService (texto → SQL → resposta),
     │                        SchemaCatalog (estrutura + seleção de tabelas), KnowledgeRepository (notas/exemplos)
