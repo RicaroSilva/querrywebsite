@@ -103,7 +103,8 @@
     main.querySelectorAll('[data-dl]').forEach((b) => b.addEventListener('click', () => {
       if (!lastResult) return;
       const f = b.dataset.dl;
-      QD.download('/export', { result_id: lastResult.result_id, format: f, scope: 'all', filename: slug(a.name),
+      // Complete result already cached → export it directly (no re-execution). Truncated → stream everything.
+      QD.download('/export', { result_id: lastResult.result_id, format: f, scope: lastResult.truncated ? 'all' : 'view', filename: slug(a.name),
         delimiter: ';', decimal: ',', bom: '1', header: '1', sheet: a.name.slice(0, 31) });
       QD.toast('Download a começar…', 'info', 2000);
     }));
@@ -130,12 +131,22 @@
     const a = current;
     try { localStorage.setItem(VKEY(a.id), JSON.stringify(values)); } catch (e) {}
     const box = main.querySelector('[data-result]');
-    box.innerHTML = `<div class="card card-body row"><span class="spinner"></span> A executar a análise (só leitura)… <span class="elapsed" data-el>0.0 s</span></div>`;
+    const execId = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    const limit = a.timeout_seconds ? ` · limite ${a.timeout_seconds >= 120 ? Math.round(a.timeout_seconds / 60) + ' min' : a.timeout_seconds + ' s'}` : '';
+    box.innerHTML = `<div class="card card-body row"><span class="spinner"></span> A executar a análise (só leitura)… <span class="elapsed" data-el>0 s</span><span class="muted small">${limit}</span>
+      <div class="spacer" style="flex:1"></div><button class="btn sm danger" data-cancel>${icon('stop', 'sm')} Cancelar</button></div>`;
+    box.querySelector('[data-cancel]').addEventListener('click', async () => {
+      try { const c = await QD.post(`/api/execute/${execId}/cancel`, {}); QD.toast(c.ok ? c.message : c.error, c.ok ? 'info' : 'error'); } catch (e) { QD.fail(e); }
+    });
     const t0 = Date.now();
-    const timer = setInterval(() => { const el = box.querySelector('[data-el]'); if (el) el.textContent = ((Date.now() - t0) / 1000).toFixed(1) + ' s'; }, 100);
+    const timer = setInterval(() => {
+      const el = box.querySelector('[data-el]');
+      const sec = Math.floor((Date.now() - t0) / 1000);
+      if (el) el.textContent = sec < 60 ? sec + ' s' : Math.floor(sec / 60) + ' min ' + (sec % 60) + ' s';
+    }, 250);
     main.querySelectorAll('[data-dl]').forEach((b) => { b.disabled = true; });
     try {
-      const r = await QD.post(`/api/analyses/${a.id}/run`, { values });
+      const r = await QD.post(`/api/analyses/${a.id}/run`, { values, execution_id: execId });
       const res = r.results.find((x) => x.type === 'rows');
       const err = r.results.find((x) => x.type === 'error');
       if (err || !res) {
@@ -183,6 +194,8 @@
         <label class="field"><span>Nome *</span><input class="input" name="name" value="${esc(a.name)}" placeholder="ex: Análise de risco de transferências"></label>
         <label class="field"><span>Categoria</span><input class="input" name="category" value="${esc(a.category || '')}" placeholder="ex: Risco / Compliance"></label>
         <label class="field full"><span>Descrição</span><input class="input" name="description" value="${esc(a.description || '')}"></label>
+        <label class="field"><span>Tempo máximo de execução (segundos)</span><input class="input" type="number" min="5" max="3600" name="timeout_seconds" value="${esc(a.timeout_seconds || '')}" placeholder="vazio = limite geral (QUERY_TIMEOUT_SECONDS)">
+          <div class="help">Para análises pesadas, ex.: 900 (15 min). Máx. 3600.</div></label>
         <label class="field"><span>Conexão *</span><select class="select" name="connection_id">${D.connections.map((c) => `<option value="${c.id}" ${+a.connection_id === +c.id ? 'selected' : ''}>${esc(c.name)} · ${esc(c.driver_label)}</option>`).join('')}</select></label>
         <div class="field"><span class="field-label">Tipo</span><div class="row" style="gap:16px;height:34px">
           <label class="check"><input type="radio" name="kind" value="function" ${a.kind === 'function' ? 'checked' : ''}> Função PostgreSQL</label>
@@ -257,6 +270,7 @@ WHERE t.amount >= {{valor_minimo}}
         action: async () => {
           const f = QD.formData(body);
           const payload = { name: f.name, description: f.description, category: f.category, connection_id: +f.connection_id,
+            timeout_seconds: f.timeout_seconds ? +f.timeout_seconds : null,
             kind: kind(), function_name: f.function_name, sql_text: f.sql_text, params: readParams(body) };
           if (payload.kind === 'function' && !payload.function_name) throw new Error('Escolha a função.');
           const r = isNew ? await QD.post('/api/analyses', payload) : await QD.put(`/api/analyses/${a.id}`, payload);

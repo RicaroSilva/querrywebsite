@@ -21,6 +21,7 @@ final class AnalysisRepository
         $a['id'] = (int) $a['id'];
         $a['connection_id'] = $a['connection_id'] !== null ? (int) $a['connection_id'] : null;
         $a['params'] = json_decode($a['params'] ?? '[]', true) ?: [];
+        $a['timeout_seconds'] = isset($a['timeout_seconds']) && $a['timeout_seconds'] !== null ? (int) $a['timeout_seconds'] : null;
         return $a;
     }
 
@@ -53,6 +54,7 @@ final class AnalysisRepository
             'function_name' => $d['kind'] === 'function' ? $d['function_name'] : null,
             'sql_text'      => $d['kind'] === 'query' ? $d['sql_text'] : null,
             'params'        => json_encode($d['params'], JSON_UNESCAPED_UNICODE),
+            'timeout_seconds' => $d['timeout_seconds'] ?? null,
             'updated_at'    => now(),
         ];
         if ($id) {

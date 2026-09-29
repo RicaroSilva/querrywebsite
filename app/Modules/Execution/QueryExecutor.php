@@ -19,6 +19,8 @@ use App\Modules\History\HistoryRepository;
  */
 final class QueryExecutor
 {
+    private int $timeout = 60;
+
     public function __construct(
         private ConnectionRepository $connections = new ConnectionRepository(),
         private HistoryRepository $history = new HistoryRepository(),
@@ -34,6 +36,7 @@ final class QueryExecutor
         $userId = (int) $opts['user_id'];
         $execId = $opts['execution_id'] ?? bin2hex(random_bytes(8));
         $timeout = (int) ($opts['timeout'] ?? config('query.timeout', 60));
+        $this->timeout = $timeout;
         $maxRows = max(1, (int) ($opts['max_rows'] ?? config('query.max_rows', 10000)));
         $pageSize = (int) ($opts['page_size'] ?? config('query.page_size', 100));
         $readOnly = !empty($opts['read_only']) || !empty($conn['read_only']);
@@ -181,6 +184,7 @@ final class QueryExecutor
             'database'      => $database,
             'sql'           => $st['bound'] ?? $st['sql'],
             'params'        => $st['params'] ?? [],
+            'timeout'       => $this->timeout,
             'columns'       => $columns,
             'row_count'     => $count,
             'truncated'     => $truncated,

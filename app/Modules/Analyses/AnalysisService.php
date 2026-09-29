@@ -26,15 +26,19 @@ final class AnalysisService
     public const INPUT_TYPES = ['text', 'number', 'integer', 'date', 'boolean', 'select'];
     private const IDENT = '[A-Za-z_][A-Za-z0-9_$]*';
 
-    public function run(array $analysis, array $conn, array $values, int $userId, ?string $database = null): array
+    public const MAX_TIMEOUT = 3600;
+
+    public function run(array $analysis, array $conn, array $values, int $userId, ?string $database = null, ?string $executionId = null): array
     {
         [$sql, $params] = $this->build($analysis, $values, $conn['driver']);
         self::assertSingleReadOnly($sql, $conn['driver']);
         $r = (new QueryExecutor())->run($conn, $sql, [
             'user_id'   => $userId,
             'database'  => $database,
-            'read_only'  => true,
-            'raw_params' => $params, // already bound by build(): one statement, positional "?"
+            'read_only'    => true,
+            'raw_params'   => $params, // already bound by build(): one statement, positional "?"
+            'timeout'      => (int) ($analysis['timeout_seconds'] ?? 0) ?: (int) config('query.timeout', 60),
+            'execution_id' => $executionId,
         ]);
         return $r + ['sql' => $sql];
     }

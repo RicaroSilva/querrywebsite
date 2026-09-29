@@ -42,7 +42,9 @@ final class AnalysisController
             'kind'          => 'required|in:function,query',
             'function_name' => 'nullable|string|max:255',
             'sql_text'      => 'nullable|string',
+            'timeout_seconds' => 'nullable|int',
         ]);
+        $d['timeout_seconds'] = $d['timeout_seconds'] ? max(5, min(AnalysisService::MAX_TIMEOUT, (int) $d['timeout_seconds'])) : null;
         $conn = (new ConnectionRepository())->findOrFail($d['connection_id']);
         $d['params'] = AnalysisService::normaliseParams((array) $request->input('params', []), $d['kind']);
         if ($d['kind'] === 'function') {
@@ -96,7 +98,8 @@ final class AnalysisController
         $values = array_filter((array) $request->input('values', []), static fn($v) => is_scalar($v) || $v === null);
         Audit::log('analysis.run', 'analysis', $a['id'], ['values' => $values]);
         Session::release();
-        $r = (new AnalysisService())->run($a, $conn, $values, (int) Auth::id());
+        $execId = preg_match('/^[a-zA-Z0-9_-]{8,64}$/', $request->str('execution_id')) ? $request->str('execution_id') : null;
+        $r = (new AnalysisService())->run($a, $conn, $values, (int) Auth::id(), null, $execId);
         Response::json(['ok' => true] + $r);
     }
 

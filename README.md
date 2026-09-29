@@ -443,6 +443,12 @@ pergunta ─▶ esquema da BD (tabelas, colunas, PK, FK — cache 10 min) + perg
 * **Query SQL** — um `SELECT` com `{{nome}}` (valores enviados como parâmetros) e blocos opcionais
   `[[ AND t.date >= {{desde}} ]]`, removidos quando o campo fica vazio. *Detetar parâmetros* cria o formulário.
 
+Cada análise pode ter o seu **tempo máximo de execução** (campo *Tempo máximo*, até 3600 s) — útil para
+funções pesadas sem aumentar o limite geral `QUERY_TIMEOUT_SECONDS`. Durante a execução há contador e botão
+**Cancelar**; os downloads usam o resultado já obtido (não re-executam), exceto se passar `QUERY_MAX_ROWS`.
+Em execuções longas aumente também o timeout do servidor web (XAMPP/Apache: `Timeout 1800` em
+`httpd.conf`; IIS: *FastCGI → Activity/Request Timeout*; nginx: `fastcgi_read_timeout`).
+
 Os valores são validados pelo tipo (número, inteiro, data, texto, sim/não, lista) e a execução é sempre
 só-leitura. Os últimos valores usados ficam memorizados no browser. *Excel* / *CSV* descarregam todas as
 linhas (re-execução em streaming); *Ver SQL* mostra a chamada exata. O utilizador da BD precisa de

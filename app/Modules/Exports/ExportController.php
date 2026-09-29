@@ -57,7 +57,7 @@ final class ExportController
         if ($scope === 'all') {
             $conn = (new ConnectionRepository())->findOrFail((int) $meta['connection_id']);
             $gen = (new QueryExecutor())->stream($conn, $meta['sql'], $meta['database'] ?? null,
-                max((int) config('query.timeout', 60), 300), $meta['params'] ?? []);
+                max((int) config('query.timeout', 60), (int) ($meta['timeout'] ?? 0), 300), $meta['params'] ?? []);
             // Execute first so SQL errors can still produce a JSON/HTML error instead of a broken file
             try {
                 $columns = $gen->current();
