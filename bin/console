@@ -72,6 +72,7 @@ $seed = static function () use ($out): void {
         $out("• Test user {$cfg['email']} created (role: admin)");
     }
     require base_path('database/seeds/demo.php');
+    require base_path('database/seeds/connections.php');
 };
 
 switch ($cmd) {
