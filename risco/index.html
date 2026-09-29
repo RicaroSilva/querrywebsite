@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Análise de risco de transferências</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --text:#1d2330; --muted:#6b7280; --line:#e3e6eb; --accent:#2563eb; --err:#b91c1c; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#111418; --card:#1a1f26; --text:#e6e9ee; --muted:#9aa3af; --line:#2b323c; --accent:#60a5fa; --err:#f87171; } }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); }
+  main { max-width:1400px; margin:0 auto; padding:20px 16px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 16px; font-family:ui-monospace,Consolas,monospace; font-size:13px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
+  form { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; align-items:end; }
+  label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); }
+  input { font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; grid-column:1/-1; }
+  button { font:inherit; padding:8px 14px; border-radius:6px; border:1px solid var(--line); background:var(--card); color:var(--text); cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button:disabled { opacity:.5; cursor:default; }
+  .status { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:10px; color:var(--muted); }
+  .status input { min-width:220px; }
+  .err { color:var(--err); white-space:pre-wrap; }
+  code { font-family:ui-monospace,Consolas,monospace; font-size:12px; }
+  .wrap { overflow:auto; max-height:70vh; border:1px solid var(--line); border-radius:6px; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th, td { padding:6px 10px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
+  th { position:sticky; top:0; background:var(--card); cursor:pointer; user-select:none; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  td.null { color:var(--muted); font-style:italic; }
+  tbody tr:hover { background:color-mix(in srgb, var(--accent) 8%, transparent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Análise de risco de transferências</h1>
+  <p class="sub" id="fn">a carregar…</p>
+
+  <div class="card">
+    <form id="form">
+      <div class="actions">
+        <button type="submit" class="primary" id="run">Executar</button>
+        <button type="button" id="csv" disabled>Download CSV</button>
+        <button type="button" id="xlsx" disabled>Download Excel</button>
+        <button type="button" id="reset">Repor valores</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card" id="out" hidden>
+    <div class="status">
+      <span id="info"></span>
+      <input type="search" id="filter" placeholder="Filtrar resultados…">
+    </div>
+    <div class="wrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+  </div>
+  <p class="err" id="err"></p>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const NUM = ['int2','int4','int8','numeric','float4','float8','money'];
+const fmt = new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 6 });
+let meta, result = null, sort = { i: -1, dir: 1 };
+
+const inputs = () => [...document.querySelectorAll('#form input[data-i]')];
+const query = action => {
+  const q = new URLSearchParams({ action });
+  inputs().forEach(el => q.append('p[]', el.value));
+  return 'api.php?' + q;
+};
+
+async function init() {
+  try {
+    meta = await (await fetch('api.php?action=meta')).json();
+    if (meta.error) throw new Error(meta.error);
+  } catch (e) { $('#err').textContent = 'Não foi possível ler a configuração: ' + e.message; return; }
+  $('#fn').textContent = 'SELECT * FROM ' + meta.function + '(' + meta.params.map(p => p.name).join(', ') + ')';
+  const saved = JSON.parse(localStorage.getItem('risco-params') || 'null');
+  const actions = $('#form .actions');
+  meta.params.forEach((p, i) => {
+    const l = document.createElement('label');
+    l.textContent = p.label || p.name;
+    const el = document.createElement('input');
+    el.type = p.input || 'text'; el.dataset.i = i; el.name = p.name;
+    if (p.input === 'number') el.step = 'any';
+    if (p.min != null) el.min = p.min;
+    if (p.max != null) el.max = p.max;
+    el.value = saved?.[i] ?? p.default ?? '';
+    l.appendChild(el);
+    $('#form').insertBefore(l, actions);
+  });
+}
+
+$('#form').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('#err').textContent = ''; $('#run').disabled = true; $('#run').textContent = 'A executar…';
+  try { localStorage.setItem('risco-params', JSON.stringify(inputs().map(el => el.value))); } catch {}
+  try {
+    const res = await (await fetch(query('run'))).json();
+    if (res.error) throw new Error(res.error);
+    result = res; sort = { i: -1, dir: 1 }; $('#filter').value = '';
+    render();
+    $('#csv').disabled = $('#xlsx').disabled = false;
+  } catch (e) {
+    $('#err').textContent = e.message; $('#out').hidden = true;
+  } finally { $('#run').disabled = false; $('#run').textContent = 'Executar'; }
+});
+
+$('#csv').onclick = () => location.href = query('csv');
+$('#xlsx').onclick = () => location.href = query('xlsx');
+$('#reset').onclick = () => inputs().forEach(el => el.value = meta.params[el.dataset.i].default ?? '');
+$('#filter').oninput = () => render();
+
+function render() {
+  const cols = result.columns, isNum = cols.map(c => NUM.includes(c.type));
+  const f = $('#filter').value.trim().toLowerCase();
+  let rows = f ? result.rows.filter(r => r.some(v => v != null && String(v).toLowerCase().includes(f))) : result.rows.slice();
+  if (sort.i >= 0) {
+    const i = sort.i;
+    rows.sort((a, b) => {
+      if (a[i] == null) return 1; if (b[i] == null) return -1;
+      return (isNum[i] ? a[i] - b[i] : String(a[i]).localeCompare(String(b[i]), 'pt')) * sort.dir;
+    });
+  }
+  $('#tbl thead').innerHTML = '<tr>' + cols.map((c, i) =>
+    `<th data-i="${i}"${isNum[i] ? ' class="num"' : ''}>${esc(c.name)}${sort.i === i ? (sort.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('') + '</tr>';
+  $('#tbl tbody').innerHTML = rows.map(r => '<tr>' + r.map((v, i) =>
+    v == null ? '<td class="null">null</td>'
+      : isNum[i] ? `<td class="num">${fmt.format(v)}</td>`
+      : `<td>${esc(v)}</td>`).join('') + '</tr>').join('');
+  $('#info').innerHTML = `${rows.length}${f ? ' de ' + result.count : ''} linhas · ${result.ms} ms · <code>${esc(result.sql)}</code>`;
+  $('#out').hidden = false;
+}
+$('#tbl thead').onclick = e => {
+  const th = e.target.closest('th'); if (!th) return;
+  const i = +th.dataset.i; sort = { i, dir: sort.i === i ? -sort.dir : 1 }; render();
+};
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+init();
+</script>
+</body>
+</html>
