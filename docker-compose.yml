@@ -1,0 +1,44 @@
+# QueryDeck + MariaDB (application database).
+#   1. Generate a key:  docker run --rm php:8.3-cli php -r 'echo "base64:".base64_encode(random_bytes(32)).PHP_EOL;'
+#   2. Put it in APP_KEY below (or in a .env file next to this compose file) and change the passwords.
+#   3. docker compose up -d --build   →  http://localhost:8080
+services:
+  app:
+    build: .
+    ports:
+      - "8080:80"
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: http://localhost:8080
+      APP_KEY: ${APP_KEY:?set APP_KEY}
+      APP_DB_DRIVER: mysql
+      APP_DB_HOST: db
+      APP_DB_PORT: 3306
+      APP_DB_DATABASE: querydeck
+      APP_DB_USERNAME: querydeck
+      APP_DB_PASSWORD: ${DB_PASSWORD:-change-me-db}
+      TEST_USER_EMAIL: ${TEST_USER_EMAIL:-admin@example.com}
+      TEST_USER_PASSWORD: ${TEST_USER_PASSWORD:-change-me}
+      QUERY_TIMEOUT_SECONDS: 60
+      QUERY_MAX_ROWS: 10000
+    volumes:
+      - querydeck-storage:/var/www/querydeck/storage
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  db:
+    image: mariadb:11
+    environment:
+      MARIADB_DATABASE: querydeck
+      MARIADB_USER: querydeck
+      MARIADB_PASSWORD: ${DB_PASSWORD:-change-me-db}
+      MARIADB_RANDOM_ROOT_PASSWORD: "yes"
+    volumes:
+      - querydeck-db:/var/lib/mysql
+    restart: unless-stopped
+
+volumes:
+  querydeck-storage:
+  querydeck-db:

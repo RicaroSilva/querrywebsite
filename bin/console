@@ -1,0 +1,135 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+
+/**
+ * QueryDeck CLI.
+ *   php bin/console install          Interactive-free install: .env, key, migrations, seed
+ *   php bin/console key:generate     Generate APP_KEY in .env
+ *   php bin/console migrate          Run pending migrations on the application DB
+ *   php bin/console db:seed          Create/update the test user from .env (+ demo data)
+ *   php bin/console user:create <email> <password> [role] [name]
+ *   php bin/console history:prune    Delete history older than HISTORY_RETENTION_DAYS
+ *   php bin/console cache:clear [--expired]  Remove cached result sets (all, or only expired ones)
+ *   php bin/console serve [port] [workers]  Start PHP's built-in dev server (development only)
+ */
+
+if (PHP_SAPI !== 'cli') {
+    exit(1);
+}
+
+$root = dirname(__DIR__);
+$cmd = $argv[1] ?? 'help';
+
+// Commands that must work before .env exists
+if ($cmd === 'install' && !is_file("$root/.env")) {
+    copy("$root/.env.example", "$root/.env");
+    echo "• .env created from .env.example\n";
+}
+
+require $root . '/app/bootstrap.php';
+
+use App\Core\Config;
+use App\Core\Crypto;
+use App\Core\Database;
+use App\Core\Migrator;
+use App\Modules\Users\UserRepository;
+
+$out = static fn(string $s) => print($s . PHP_EOL);
+
+$generateKey = static function (bool $force = false) use ($root, $out): void {
+    $env = file_get_contents("$root/.env");
+    if (!$force && preg_match('/^APP_KEY=\S+/m', $env)) {
+        $out('• APP_KEY already set (use key:generate --force to rotate — this breaks stored passwords!)');
+        return;
+    }
+    $key = Crypto::generateKey();
+    $env = preg_match('/^APP_KEY=.*$/m', $env)
+        ? preg_replace('/^APP_KEY=.*$/m', 'APP_KEY=' . $key, $env)
+        : $env . "\nAPP_KEY=$key\n";
+    file_put_contents("$root/.env", $env);
+    Config::set('app.key', $key);
+    $out('• APP_KEY generated');
+};
+
+$migrate = static function () use ($out): void {
+    $n = (new Migrator(Database::get()))->run($out);
+    $out($n ? "• $n migration(s) applied" : '• Nothing to migrate');
+};
+
+$seed = static function () use ($out): void {
+    $cfg = config('app.test_user');
+    if (empty($cfg['email']) || empty($cfg['password'])) {
+        $out('! TEST_USER_EMAIL / TEST_USER_PASSWORD not set in .env — skipping user seed');
+        return;
+    }
+    $users = new UserRepository();
+    $existing = $users->findByEmail($cfg['email']);
+    if ($existing) {
+        $out("• Test user {$cfg['email']} already exists (password unchanged)");
+    } else {
+        $users->create(['name' => $cfg['name'], 'email' => $cfg['email'], 'password' => $cfg['password'], 'role' => 'admin']);
+        $out("• Test user {$cfg['email']} created (role: admin)");
+    }
+    require base_path('database/seeds/demo.php');
+};
+
+switch ($cmd) {
+    case 'install':
+        foreach (['storage/logs', 'storage/cache/results', 'storage/cache/running', 'storage/sqlite'] as $d) {
+            is_dir("$root/$d") || mkdir("$root/$d", 0770, true);
+        }
+        $generateKey();
+        $migrate();
+        $seed();
+        $out("\n✔ QueryDeck installed. Start with: php bin/console serve");
+        break;
+    case 'key:generate':
+        $generateKey(in_array('--force', $argv, true));
+        break;
+    case 'migrate':
+        $migrate();
+        break;
+    case 'db:seed':
+        $seed();
+        break;
+    case 'user:create':
+        [$email, $password] = [$argv[2] ?? null, $argv[3] ?? null];
+        if (!$email || !$password) {
+            $out('Usage: user:create <email> <password> [admin|editor|readonly] [name]');
+            exit(1);
+        }
+        (new UserRepository())->create(['email' => $email, 'password' => $password,
+            'role' => $argv[4] ?? 'editor', 'name' => $argv[5] ?? $email]);
+        $out("• User $email created");
+        break;
+    case 'history:prune':
+        $days = (int) config('query.history_days', 180);
+        $n = Database::get()->run('DELETE FROM query_history WHERE created_at < ?',
+            [date('Y-m-d H:i:s', strtotime("-$days days"))])->rowCount();
+        $out("• $n history rows removed");
+        break;
+    case 'cache:clear':
+        // --expired: only result sets older than RESULT_CACHE_TTL (safe to run from cron)
+        $ttl = in_array('--expired', $argv, true) ? (int) config('query.cache_ttl', 3600) : -1;
+        $n = 0;
+        foreach (glob(storage_path('cache/{results,running}/*'), GLOB_BRACE) ?: [] as $f) {
+            if ($ttl < 0 || filemtime($f) < time() - max($ttl, str_contains($f, '/running/') ? 86400 : 0)) {
+                @unlink($f) && $n++;
+            }
+        }
+        foreach (glob(storage_path('cache/completion_*.json')) ?: [] as $f) {
+            @unlink($f) && $n++;
+        }
+        $out("• $n cache files removed");
+        break;
+    case 'serve':
+        $port = (int) ($argv[2] ?? 8080);
+        $out("QueryDeck running at http://localhost:$port  (Ctrl+C to stop)");
+        // Several workers so a long query doesn't block other requests (e.g. "Cancel").
+        passthru(sprintf('PHP_CLI_SERVER_WORKERS=%d %s -S 0.0.0.0:%d -t %s %s', (int) ($argv[3] ?? 4), PHP_BINARY, $port,
+            escapeshellarg("$root/public"), escapeshellarg("$root/public/index.php")));
+        break;
+    default:
+        $out(trim(preg_replace('/^\s*\*\s?/m', '', explode('*/', explode('/**', file_get_contents(__FILE__), 2)[1])[0])));
+}

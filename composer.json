@@ -1,0 +1,32 @@
+{
+    "name": "querydeck/querydeck",
+    "description": "Database Management & Reporting Platform — web SQL client (PostgreSQL, MySQL/MariaDB, SQL Server, SQLite) with saved queries, exports and reports.",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.1",
+        "ext-pdo": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "ext-sodium": "*",
+        "ext-zip": "*"
+    },
+    "suggest": {
+        "ext-pdo_mysql": "Application DB on MySQL/MariaDB and MySQL/MariaDB connections",
+        "ext-pdo_pgsql": "PostgreSQL connections",
+        "ext-pdo_sqlsrv": "SQL Server connections (Microsoft driver, recommended)",
+        "ext-pdo_dblib": "SQL Server connections via FreeTDS (fallback)",
+        "ext-pdo_sqlite": "SQLite connections / SQLite application DB",
+        "ext-intl": "Localised dates"
+    },
+    "autoload": {
+        "psr-4": { "App\\": "app/" },
+        "files": ["app/helpers.php"]
+    },
+    "scripts": {
+        "install-app": "php bin/console install",
+        "test": "php tests/run.php",
+        "serve": "php bin/console serve"
+    },
+    "config": { "sort-packages": true }
+}

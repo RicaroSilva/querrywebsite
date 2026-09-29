@@ -1,0 +1,8 @@
+# Shared-hosting fallback: if the web root is the project root, route every
+# request into public/ so that .env, app/, storage/... are never served.
+# Preferred setup: point the virtual host DocumentRoot at /public.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^$ public/ [L]
+    RewriteRule ^((?!public/).*)$ public/$1 [L,NC]
+</IfModule>

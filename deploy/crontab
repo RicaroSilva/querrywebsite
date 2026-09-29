@@ -1,0 +1,5 @@
+# QueryDeck maintenance (install with: crontab -u www-data deploy/crontab — adjust the path)
+# Remove history older than HISTORY_RETENTION_DAYS, every night at 03:15
+15 3 * * * cd /var/www/querydeck && php bin/console history:prune >> storage/logs/cron.log 2>&1
+# Remove expired cached result sets every hour
+5 * * * * cd /var/www/querydeck && php bin/console cache:clear --expired >> storage/logs/cron.log 2>&1
