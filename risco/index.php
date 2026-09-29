@@ -1,3 +1,7 @@
+<?php
+$config = require __DIR__ . '/config.php';
+require __DIR__ . '/auth.php';
+?>
 <!doctype html>
 <html lang="pt">
 <head>
@@ -15,7 +19,7 @@
   .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
   form { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; align-items:end; }
   label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); }
-  input { font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); }
+  input, select { font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); }
   .actions { display:flex; gap:8px; flex-wrap:wrap; grid-column:1/-1; }
   button { font:inherit; padding:8px 14px; border-radius:6px; border:1px solid var(--line); background:var(--card); color:var(--text); cursor:pointer; }
   button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
@@ -35,16 +39,14 @@
 </head>
 <body>
 <main>
-  <h1>Análise de risco de transferências</h1>
-  <p class="sub" id="fn">a carregar…</p>
-
+  <h1 id="title">Análise de risco de transferências</h1>
+  
   <div class="card">
     <form id="form">
       <div class="actions">
         <button type="submit" class="primary" id="run">Executar</button>
         <button type="button" id="csv" disabled>Download CSV</button>
         <button type="button" id="xlsx" disabled>Download Excel</button>
-        <button type="button" id="reset">Repor valores</button>
       </div>
     </form>
   </div>
@@ -64,10 +66,11 @@ const NUM = ['int2','int4','int8','numeric','float4','float8','money'];
 const fmt = new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 6 });
 let meta, result = null, sort = { i: -1, dir: 1 };
 
-const inputs = () => [...document.querySelectorAll('#form input[data-i]')];
+const inputs = () => [...document.querySelectorAll('#form [data-i]')];
+const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const query = action => {
   const q = new URLSearchParams({ action });
-  inputs().forEach(el => q.append('p[]', el.value));
+  inputs().forEach(el => q.append('p[' + el.name + ']', el.value));
   return 'api.php?' + q;
 };
 
@@ -76,18 +79,25 @@ async function init() {
     meta = await (await fetch('api.php?action=meta')).json();
     if (meta.error) throw new Error(meta.error);
   } catch (e) { $('#err').textContent = 'Não foi possível ler a configuração: ' + e.message; return; }
-  $('#fn').textContent = 'SELECT * FROM ' + meta.function + '(' + meta.params.map(p => p.name).join(', ') + ')';
+  document.title = $('#title').textContent = meta.title;
   const saved = JSON.parse(localStorage.getItem('risco-params') || 'null');
   const actions = $('#form .actions');
   meta.params.forEach((p, i) => {
     const l = document.createElement('label');
     l.textContent = p.label || p.name;
-    const el = document.createElement('input');
-    el.type = p.input || 'text'; el.dataset.i = i; el.name = p.name;
+    let el;
+    if (p.input === 'month') {
+      el = document.createElement('select');
+      el.innerHTML = MONTHS.map((m, k) => `<option value="${k + 1}">${m}</option>`).join('');
+    } else {
+      el = document.createElement('input');
+      el.type = p.input || 'text';
+    }
+    el.dataset.i = i; el.name = p.name;
     if (p.input === 'number') el.step = 'any';
     if (p.min != null) el.min = p.min;
     if (p.max != null) el.max = p.max;
-    el.value = saved?.[i] ?? p.default ?? '';
+    el.value = saved?.[p.name] ?? p.default ?? '';
     l.appendChild(el);
     $('#form').insertBefore(l, actions);
   });
@@ -96,7 +106,7 @@ async function init() {
 $('#form').addEventListener('submit', async e => {
   e.preventDefault();
   $('#err').textContent = ''; $('#run').disabled = true; $('#run').textContent = 'A executar…';
-  try { localStorage.setItem('risco-params', JSON.stringify(inputs().map(el => el.value))); } catch {}
+  try { localStorage.setItem('risco-params', JSON.stringify(Object.fromEntries(inputs().map(el => [el.name, el.value])))); } catch {}
   try {
     const res = await (await fetch(query('run'))).json();
     if (res.error) throw new Error(res.error);
@@ -110,7 +120,6 @@ $('#form').addEventListener('submit', async e => {
 
 $('#csv').onclick = () => location.href = query('csv');
 $('#xlsx').onclick = () => location.href = query('xlsx');
-$('#reset').onclick = () => inputs().forEach(el => el.value = meta.params[el.dataset.i].default ?? '');
 $('#filter').oninput = () => render();
 
 function render() {
@@ -130,7 +139,7 @@ function render() {
     v == null ? '<td class="null">null</td>'
       : isNum[i] ? `<td class="num">${fmt.format(v)}</td>`
       : `<td>${esc(v)}</td>`).join('') + '</tr>').join('');
-  $('#info').innerHTML = `${rows.length}${f ? ' de ' + result.count : ''} linhas · ${result.ms} ms · <code>${esc(result.sql)}</code>`;
+  $('#info').innerHTML = `${rows.length}${f ? ' de ' + result.count : ''} linhas · ${(result.ms / 1000).toLocaleString('pt-PT')} s`;
   $('#out').hidden = false;
 }
 $('#tbl thead').onclick = e => {

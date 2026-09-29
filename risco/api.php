@@ -2,8 +2,8 @@
 /**
  * Backend da página: executa SELECT * FROM <função>(...) e devolve JSON, CSV ou XLSX.
  *   api.php?action=meta                 -> parâmetros configurados
- *   api.php?action=run&p[]=..&p[]=..    -> resultado em JSON
- *   api.php?action=csv|xlsx&p[]=..      -> download
+ *   api.php?action=run&p[nome]=..       -> resultado em JSON
+ *   api.php?action=csv|xlsx&p[nome]=..  -> download
  */
 declare(strict_types=1);
 
@@ -12,12 +12,16 @@ if (!is_file($configFile)) {
     fail('Falta o ficheiro config.php (copie config.example.php para config.php).', 500);
 }
 $config = require $configFile;
+require __DIR__ . '/auth.php';
 $action = $_GET['action'] ?? 'run';
 
 if ($action === 'meta') {
     json([
-        'function' => $config['function'],
-        'params'   => array_map(fn($p) => array_intersect_key($p, array_flip(['name', 'label', 'type', 'input', 'default', 'min', 'max'])), $config['params']),
+        'title'  => $config['title'] ?? 'Análise',
+        'params' => array_values(array_map(
+            fn($p) => array_intersect_key($p, array_flip(['name', 'label', 'input', 'default', 'min', 'max'])),
+            array_filter($config['params'], fn($p) => empty($p['hidden']))
+        )),
     ]);
 }
 
@@ -52,15 +56,17 @@ function runQuery(array $config, array $input): array
     $placeholders = [];
     $values = [];
     $shown = [];
-    foreach ($config['params'] as $i => $p) {
-        $raw = isset($input[$i]) ? trim((string)$input[$i]) : '';
+    foreach ($config['params'] as $p) {
+        // parâmetros "hidden" usam sempre o valor fixo do config (não podem ser alterados na página)
+        $raw = !empty($p['hidden']) ? (string)($p['default'] ?? '')
+            : (isset($input[$p['name']]) ? trim((string)$input[$p['name']]) : '');
         $type = preg_match('/^[a-z][a-z0-9_ ]*(\[\])?$/i', $p['type'] ?? '') ? $p['type'] : null;
         if ($raw === '') {
             $placeholders[] = 'NULL' . ($type ? "::$type" : '');
             $shown[] = 'NULL';
             continue;
         }
-        if (($p['input'] ?? '') === 'number' && !is_numeric($raw)) {
+        if (in_array($p['input'] ?? '', ['number', 'month'], true) && !is_numeric($raw)) {
             throw new InvalidArgumentException(sprintf('"%s" tem de ser um número.', $p['label'] ?? $p['name']));
         }
         $placeholders[] = '?' . ($type ? "::$type" : '');
