@@ -23,11 +23,36 @@ final class Request
         return strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
     }
 
+    /**
+     * URL prefix of the application ("" at a domain root, "/querydeck" in a sub-folder).
+     * Supports both a web root pointing at public/ and a project folder served as-is
+     * (e.g. XAMPP htdocs/querydeck, where the root .htaccess rewrites into public/).
+     */
+    public static function basePath(): string
+    {
+        static $cache = null;
+        if ($cache !== null && PHP_SAPI !== 'cli') {
+            return $cache;
+        }
+        $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '')), '/.');
+        $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+        if (str_ends_with($base, '/public') && $uri !== $base && !str_starts_with($uri, $base . '/')) {
+            $base = substr($base, 0, -7); // request came through the project-root .htaccess
+        }
+        return $cache = $base;
+    }
+
+    /** Cookie path: the app folder (without /public) so both URL styles share the session. */
+    public static function cookiePath(): string
+    {
+        return (string) preg_replace('#/public$#', '', self::basePath()) . '/';
+    }
+
     public function path(): string
     {
-        $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-        $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '')), '/.');
-        if ($base !== '' && str_starts_with($uri, $base)) {
+        $uri = rawurldecode(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/');
+        $base = self::basePath();
+        if ($base !== '' && ($uri === $base || str_starts_with($uri, $base . '/'))) {
             $uri = substr($uri, strlen($base));
         }
         $uri = '/' . trim($uri, '/');

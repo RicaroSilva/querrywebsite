@@ -167,6 +167,22 @@ Atualizações: `git pull && php bin/console migrate`.
 
 ---
 
+### XAMPP (teste local no Windows)
+
+1. Copiar a pasta do projeto para `C:\xampp\htdocs\querydeck`.
+2. Em `C:\xampp\php\php.ini` confirmar que estão ativas (sem `;`): `extension=sodium`, `extension=zip`,
+   `extension=intl`, `extension=curl`, `extension=mbstring`, `extension=pdo_mysql`, `extension=pdo_sqlite`
+   (e `extension=pdo_pgsql` se usar PostgreSQL). Reiniciar o Apache no XAMPP Control Panel.
+3. No *Shell* do XAMPP Control Panel:
+   ```bat
+   cd C:\xampp\htdocs\querydeck
+   copy .env.example .env
+   php bin/console install
+   ```
+   Antes do `install`, no `.env`, ou `APP_DB_DRIVER=sqlite`, ou use o MariaDB do XAMPP:
+   crie a BD `querydeck` no phpMyAdmin e defina `APP_DB_USERNAME=root` / `APP_DB_PASSWORD=` (vazio por omissão no XAMPP).
+4. Abrir `http://localhost/querydeck/` (o `.htaccess` da raiz encaminha tudo para `public/`).
+
 ### Windows / Windows Server
 
 1. **PHP:** descarregar o PHP 8.3 **x64 Non Thread Safe** (zip) de <https://windows.php.net/download/>,

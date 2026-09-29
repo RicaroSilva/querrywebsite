@@ -23,7 +23,7 @@ final class Session
         session_name($cfg['name']);
         session_set_cookie_params([
             'lifetime' => 0,
-            'path'     => url(''),
+            'path'     => Request::cookiePath(),
             'secure'   => $secure,
             'httponly' => true,
             'samesite' => 'Lax',

@@ -34,12 +34,7 @@ function e(mixed $value): string
 /** Build an absolute URL path inside the app (supports sub-directory installs). */
 function url(string $path = ''): string
 {
-    static $base = null;
-    if ($base === null) {
-        $script = $_SERVER['SCRIPT_NAME'] ?? '';
-        $base = rtrim(str_replace('\\', '/', dirname($script)), '/.');
-    }
-    return $base . '/' . ltrim($path, '/');
+    return App\Core\Request::basePath() . '/' . ltrim($path, '/');
 }
 
 function asset(string $path): string
