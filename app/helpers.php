@@ -94,3 +94,9 @@ function long_date(): string
     }
     return date('d/m/Y');
 }
+
+/** True for "/x", "\x", "C:\x" and "C:/x" (Linux and Windows absolute paths). */
+function is_absolute_path(string $path): bool
+{
+    return $path !== '' && ($path[0] === '/' || $path[0] === '\\' || preg_match('#^[A-Za-z]:[\\\\/]#', $path) === 1);
+}

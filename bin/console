@@ -126,9 +126,17 @@ switch ($cmd) {
     case 'serve':
         $port = (int) ($argv[2] ?? 8080);
         $out("QueryDeck running at http://localhost:$port  (Ctrl+C to stop)");
-        // Several workers so a long query doesn't block other requests (e.g. "Cancel").
-        passthru(sprintf('PHP_CLI_SERVER_WORKERS=%d %s -S 0.0.0.0:%d -t %s %s', (int) ($argv[3] ?? 4), PHP_BINARY, $port,
-            escapeshellarg("$root/public"), escapeshellarg("$root/public/index.php")));
+        $cmd = sprintf('%s -S 0.0.0.0:%d -t %s %s', escapeshellarg(PHP_BINARY), $port,
+            escapeshellarg("$root/public"), escapeshellarg("$root/public/index.php"));
+        if (PHP_OS_FAMILY === 'Windows') {
+            // The built-in server has no worker processes on Windows: one request at a time
+            // (a long query blocks "Cancel"). Use IIS/Apache for real use — see README.
+            $out('(Windows: servidor de desenvolvimento com 1 processo)');
+            passthru($cmd);
+        } else {
+            // Several workers so a long query doesn't block other requests (e.g. "Cancel").
+            passthru(sprintf('PHP_CLI_SERVER_WORKERS=%d %s', (int) ($argv[3] ?? 4), $cmd));
+        }
         break;
     default:
         $out(trim(preg_replace('/^\s*\*\s?/m', '', explode('*/', explode('/**', file_get_contents(__FILE__), 2)[1])[0])));

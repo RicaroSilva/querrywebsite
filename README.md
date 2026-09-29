@@ -167,6 +167,46 @@ Atualizações: `git pull && php bin/console migrate`.
 
 ---
 
+### Windows / Windows Server
+
+1. **PHP:** descarregar o PHP 8.3 **x64 Non Thread Safe** (zip) de <https://windows.php.net/download/>,
+   extrair para `C:\php` e adicionar `C:\php` ao `PATH`. Pode ser preciso o
+   [Visual C++ Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe).
+2. Copiar `C:\php\php.ini-production` para `C:\php\php.ini` e ativar (tirar o `;`):
+   ```ini
+   extension_dir = "ext"
+   extension=curl
+   extension=fileinfo
+   extension=intl
+   extension=mbstring
+   extension=openssl
+   extension=pdo_mysql
+   extension=pdo_pgsql
+   extension=pdo_sqlite
+   extension=sodium
+   extension=sqlite3
+   extension=zip
+   ```
+   Confirmar com `php -m`. Para SQL Server instale os drivers
+   [Microsoft Drivers for PHP for SQL Server](https://learn.microsoft.com/sql/connect/php/download-drivers-php-sql-server)
+   (`php_pdo_sqlsrv_83_nts_x64.dll` em `C:\php\ext` + `extension=pdo_sqlsrv_83_nts_x64`) e o ODBC Driver 18.
+3. **Código:** `git clone -b <branch> https://github.com/RicaroSilva/querrywebsite.git C:\querydeck`
+   (ou *Code → Download ZIP* no GitHub, escolhendo o branch certo).
+4. No PowerShell, em `C:\querydeck`:
+   ```powershell
+   copy .env.example .env
+   notepad .env        # para testar: APP_DB_DRIVER=sqlite
+   php bin/console install
+   php bin/console serve 8090
+   ```
+   Abrir `http://localhost:8090`. No Windows o servidor de desenvolvimento do PHP atende **um pedido de cada
+   vez** (o botão *Cancelar* só responde quando a query termina) — é só para testes.
+5. **Produção em IIS:** instalar IIS com **CGI** e o módulo **URL Rewrite**, registar o PHP como FastCGI
+   (`C:\php\php-cgi.exe`, *Handler Mappings* → `*.php`), criar um site com o caminho físico
+   **`C:\querydeck\public`** (inclui `web.config`) e dar à conta do *Application Pool* permissão de escrita em
+   `C:\querydeck\storage`. Aumentar em *FastCGI Settings* o *Activity/Request Timeout* (ex.: 600 s) para
+   queries longas. Alternativa: Apache para Windows (Apache Lounge) com `deploy/apache/querydeck.conf`.
+
 ## 6. Docker
 
 ```bash

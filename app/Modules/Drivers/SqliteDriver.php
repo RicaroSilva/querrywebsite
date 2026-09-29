@@ -48,13 +48,13 @@ final class SqliteDriver extends AbstractPdoDriver
     public static function allowedDirs(): array
     {
         $dirs = array_filter(array_map('trim', explode(',', (string) env('SQLITE_ALLOWED_DIRS', 'storage/sqlite'))));
-        return array_map(static fn($d) => str_starts_with($d, '/') ? rtrim($d, '/') : base_path(rtrim($d, '/')), $dirs);
+        return array_map(static fn($d) => is_absolute_path($d) ? rtrim($d, '/\\') : base_path(rtrim($d, '/\\')), $dirs);
     }
 
     /** Resolve and validate the file path (prevents reading arbitrary files on the server). */
     public static function resolvePath(string $path): string
     {
-        $abs = str_starts_with($path, '/') ? $path : base_path($path);
+        $abs = is_absolute_path($path) ? $path : base_path($path);
         $real = realpath($abs);
         if ($real === false || !is_file($real)) {
             throw new \RuntimeException("Ficheiro SQLite não encontrado: $path");

@@ -26,7 +26,7 @@ final class Database
 
         if ($this->driver === 'sqlite') {
             $path = $cfg['sqlite'];
-            if (!str_starts_with($path, '/')) {
+            if (!is_absolute_path($path)) {
                 $path = base_path($path);
             }
             if (!is_dir(dirname($path))) {
